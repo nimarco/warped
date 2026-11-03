@@ -2,9 +2,18 @@
  * autocomplete.js
  * The guess box. Searches iTunes as you type (after a short pause) and shows
  * a keyboard-friendly list of songs, following the ARIA combobox pattern.
+ * iTunes allows only so many searches a minute, so typing more words of the
+ * same search narrows the songs it already found instead of searching again.
  */
 
-import { SEARCH_DEBOUNCE_MS } from "./config.js";
+import { BUSY_RETRIES, BUSY_RETRY_MS, MAX_SUGGESTIONS, SEARCH_DEBOUNCE_MS } from "./config.js";
+import { toWords } from "./matching.js";
+
+/** True if every typed word is the start of a word in the song's title or artist. */
+function matchesTyping(song, typedWords) {
+  const songWords = toWords(`${song.title} ${song.artist}`);
+  return typedWords.every((typed) => songWords.some((word) => word.startsWith(typed)));
+}
 
 export class Autocomplete {
   /**
@@ -18,6 +27,7 @@ export class Autocomplete {
     this.list = list;
     this.search = search;
     this.songs = [];
+    this.found = { term: "", songs: [] };
     this.activeIndex = -1;
     this.chosen = null;
     this.timer = null;
@@ -53,10 +63,46 @@ export class Autocomplete {
       return;
     }
 
+    // Typing more of the last search narrows its songs right away, with no new request.
+    const known = this.knownSongsFor(term);
+    if (known) {
+      this.show(known);
+      return;
+    }
+
+    // The list on screen no longer fits what's typed, so Enter shouldn't pick from it.
+    this.setActive(-1);
     this.timer = setTimeout(() => this.runSearch(term), SEARCH_DEBOUNCE_MS);
   }
 
-  async runSearch(term) {
+  /**
+   * The last search's songs, if what's typed only adds to that search: all of
+   * them for the same words, or the ones that still match when more words are
+   * typed. Null means it needs a new search.
+   */
+  knownSongsFor(term) {
+    const searched = toWords(this.found.term).join(" ");
+    const typedWords = toWords(term);
+    const typed = typedWords.join(" ");
+
+    if (!searched || !typed.startsWith(searched)) {
+      return null;
+    }
+    if (typed === searched) {
+      return this.found.songs;
+    }
+    const narrowed = this.found.songs.filter((song) => matchesTyping(song, typedWords));
+    return narrowed.length > 0 ? narrowed : null;
+  }
+
+  async runSearch(term, attempt = 1) {
+    // A search that finished during the pause may already cover this.
+    const known = this.knownSongsFor(term);
+    if (known) {
+      this.show(known);
+      return;
+    }
+
     const requestId = ++this.requestId;
     this.renderMessage("Searching…");
 
@@ -66,18 +112,36 @@ export class Autocomplete {
       if (requestId !== this.requestId) {
         return;
       }
-      this.songs = songs;
-      this.activeIndex = songs.length > 0 ? 0 : -1;
-      if (songs.length > 0) {
-        this.render();
-      } else {
-        this.renderMessage("No songs found. Try the artist's name too.");
+      this.found = { term, songs };
+      // The player may have typed more while this search ran.
+      const forInput = this.knownSongsFor(this.input.value);
+      if (forInput) {
+        this.show(forInput);
       }
     } catch (error) {
-      if (requestId === this.requestId) {
-        this.songs = [];
+      if (requestId !== this.requestId) {
+        return;
+      }
+      this.songs = [];
+      if (error.busy && attempt <= BUSY_RETRIES) {
+        // iTunes is turning this network away for a few seconds. Search again
+        // soon; typing anything new cancels this and searches for that instead.
+        this.renderMessage("Search is busy. Trying again in a few seconds…");
+        this.timer = setTimeout(() => this.runSearch(term, attempt + 1), BUSY_RETRY_MS);
+      } else {
         this.renderMessage(error.message);
       }
+    }
+  }
+
+  /** List the best few songs, or say that nothing matched. */
+  show(songs) {
+    this.songs = songs.slice(0, MAX_SUGGESTIONS);
+    this.activeIndex = this.songs.length > 0 ? 0 : -1;
+    if (this.songs.length > 0) {
+      this.render();
+    } else {
+      this.renderMessage("No songs found. Try the artist's name too.");
     }
   }
 
@@ -89,7 +153,7 @@ export class Autocomplete {
       this.setActive((this.activeIndex + 1) % this.songs.length);
     } else if (event.key === "ArrowUp" && isOpen) {
       event.preventDefault();
-      this.setActive((this.activeIndex - 1 + this.songs.length) % this.songs.length);
+      this.setActive(this.activeIndex <= 0 ? this.songs.length - 1 : this.activeIndex - 1);
     } else if (event.key === "Escape") {
       this.close();
     }
@@ -97,7 +161,8 @@ export class Autocomplete {
 
   setActive(index) {
     this.activeIndex = index;
-    for (const option of this.list.children) {
+    this.input.removeAttribute("aria-activedescendant");
+    for (const option of this.list.querySelectorAll("[role=option]")) {
       const selected = Number(option.dataset.index) === index;
       option.setAttribute("aria-selected", String(selected));
       if (selected) {

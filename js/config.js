@@ -63,5 +63,14 @@ export const LAUNCH_DATE = new Date(2026, 10, 2);
 // Search box waits this long after typing stops before asking iTunes.
 export const SEARCH_DEBOUNCE_MS = 300;
 
+// How many songs the search box lists at once.
+export const MAX_SUGGESTIONS = 8;
+
 // Give up on an iTunes request after this long.
 export const REQUEST_TIMEOUT_MS = 8000;
+
+// iTunes turns requests away for a few seconds when too many come from one
+// network (like a campus Wi-Fi). Wait this long before trying again (Apple
+// asks for about 12 seconds), and give up after this many retries.
+export const BUSY_RETRY_MS = 12000;
+export const BUSY_RETRIES = 3;

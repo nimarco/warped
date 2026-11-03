@@ -5,12 +5,14 @@
  * cleaned-up title and artist instead of by ID.
  */
 
+/** "Beyoncé" → "Beyonce": split each letter from its accent, then drop the accents. */
+function removeAccents(text) {
+  return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
 /** Lowercase, strip accents, "(Remastered 2011)", "- Single Version", "feat. X" and punctuation. */
 export function normalizeTitle(title) {
-  return title
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+  return removeAccents(title.toLowerCase())
     .replace(/\(.*?\)|\[.*?\]/g, " ")
     .replace(/ - .*$/, "")
     .replace(/\bfeat\..*$|\bft\..*$/, "")
@@ -21,12 +23,17 @@ export function normalizeTitle(title) {
 
 /** Split "Mark Ronson & Bruno Mars feat. X" into ["mark ronson", "bruno mars", "x"]. */
 export function splitArtists(artist) {
-  return artist
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+  return removeAccents(artist.toLowerCase())
     .split(/,|&| and | x | feat\.? | ft\.? | with /)
     .map((name) => name.replace(/^the /, "").replace(/[^a-z0-9]+/g, " ").trim())
+    .filter(Boolean);
+}
+
+/** Every word in a title or artist: "Don't Stop (Live)" → ["don", "t", "stop", "live"]. */
+export function toWords(text) {
+  return removeAccents(text.toLowerCase())
+    .replace(/&/g, "and")
+    .split(/[^a-z0-9]+/)
     .filter(Boolean);
 }
 
