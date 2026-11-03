@@ -183,7 +183,7 @@ export class Autocomplete {
       const title = document.createElement("strong");
       title.textContent = song.title;
       const artist = document.createElement("span");
-      artist.textContent = song.artist;
+      artist.textContent = song.year ? `${song.artist} · ${song.year}` : song.artist;
       text.append(title, artist);
 
       option.append(art, text);
