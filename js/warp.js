@@ -36,6 +36,11 @@ export async function unlockAudio() {
   }
 }
 
+/** True once the browser allows sound, so a clip can start without another click. */
+export function audioUnlocked() {
+  return context?.state === "running";
+}
+
 /** Blend between two numbers: t = 0 gives a, t = 1 gives b. */
 function lerp(a, b, t) {
   return a + (b - a) * t;
