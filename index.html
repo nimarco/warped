@@ -125,15 +125,15 @@
         <ol class="guesses" id="guesses" aria-label="Your guesses"></ol>
 
         <div class="peeks">
-          <p class="peeks-label">Stuck? Peek <span>(each costs 25%)</span></p>
+          <p class="peeks-label">Stuck? Peek <span>(lowers this track's points)</span></p>
           <div class="peeks-buttons">
             <button class="button button-peek" id="peek-art-button" type="button">
               <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12h16M12 4v16"/></svg>
-              Blurry cover
+              Blurry cover <span class="peek-cost">−25%</span>
             </button>
             <button class="button button-peek" id="peek-video-button" type="button" disabled>
               <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg>
-              Music video
+              Music video <span class="peek-cost">−50%</span>
             </button>
           </div>
         </div>
@@ -209,7 +209,7 @@
         </span>
       </li>
       <li>
-        <strong>Score.</strong> 250 points on try 1, then 200, 150, 100 and 50 on the clean song. Peeking at the cover or video costs 25% each.
+        <strong>Score.</strong> 250 points on try 1, then 200, 150, 100 and 50 on the clean song. Stuck? Peeking at the blurry cover costs 25% of the track's points, and the music video another 50%.
       </li>
     </ol>
     <p class="help-legend">

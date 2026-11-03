@@ -24,7 +24,7 @@ import {
 } from "./storage.js";
 import * as ui from "./ui.js";
 import { Visualizer } from "./visualizer.js";
-import { playBlip, unlockAudio, WarpPlayer } from "./warp.js";
+import { audioUnlocked, playBlip, unlockAudio, WarpPlayer } from "./warp.js";
 
 const { elements } = ui;
 
@@ -101,6 +101,11 @@ async function startTrack(candidates, tier, saved) {
       ui.setGuessEnabled(true);
       if (app.round.peeks > 0) {
         restorePeek();
+      }
+      // Every track is loaded by a click (Press play, Next, Free Play), so the
+      // clip can start right away instead of asking for a second click.
+      if (audioUnlocked()) {
+        playClip();
       }
     }
   } catch (error) {

@@ -47,10 +47,13 @@ export const POINTS_BY_TRY = [250, 200, 150, 100, 50];
 
 export const MAX_TRIES = POINTS_BY_TRY.length;
 
-// Each peek removes this fraction of the track's points.
-export const PEEK_COST = 0.25;
+// What each peek removes from the track's points, in order. The music video
+// usually shows the artist, so it costs much more than the blurry cover:
+// both peeks on try 1 leave 25% (63 points), less than an honest try 4 (100).
+// The costs are also written out in index.html (peek buttons and help).
+export const PEEK_COSTS = [0.25, 0.5];
 
-export const MAX_PEEKS = 2;
+export const MAX_PEEKS = PEEK_COSTS.length;
 
 export const TRACKS_PER_DAY = 4;
 

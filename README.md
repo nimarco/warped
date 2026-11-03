@@ -11,7 +11,7 @@ Warped is a daily song-guessing game. Every day there are four songs, from Easy 
 | Warble | Slowed down and wobbling, like a melted record |
 | Muffled | Like hearing it through a wall |
 
-Every wrong guess or skip peels off one layer, so the song gets clearer. Fewer layers needed means more points: 250 on try 1, down to 50 on the clean song. Stuck? **Peek** at a pixelated album cover, then the music video, for 25% of the track's points each.
+Every wrong guess or skip peels off one layer, so the song gets clearer. Fewer layers needed means more points: 250 on try 1, down to 50 on the clean song. Stuck? **Peek** at a pixelated album cover (−25% of the track's points), then the music video (another −50%, since it usually shows the artist).
 
 After four songs you get a score out of 1000, a streak, and a spoiler-free emoji result to share. **Free Play** offers unlimited extra songs, with an optional era filter.
 

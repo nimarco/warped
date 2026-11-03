@@ -18,7 +18,8 @@
 
   --text: #f4ecd8;
   --text-dim: #a89fb0;
-  --text-faint: #6f6678;
+  /* Lightest gray that still passes WCAG AA (4.5:1) on every panel color */
+  --text-faint: #8a8193;
 
   --accent: #ff3d7f;
   --accent-hover: #ff5d94;
@@ -1085,11 +1086,23 @@ svg {
   font-size: 14px;
 }
 
+.peek-cost {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--text-faint);
+}
+
 .button-peek.is-used {
   border-style: solid;
   border-color: var(--partial);
   color: var(--partial);
   opacity: 1;
+}
+
+.button-peek.is-used .peek-cost {
+  color: inherit;
 }
 
 /* ---------- Reveal ---------- */

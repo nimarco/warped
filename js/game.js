@@ -4,13 +4,14 @@
  * Pure logic with no page code, so it's easy to read and test.
  */
 
-import { LAYER_ORDER, LAYER_INTENSITY, MAX_PEEKS, MAX_TRIES, PEEK_COST, POINTS_BY_TRY, TIER_MULTIPLIER } from "./config.js";
+import { LAYER_ORDER, LAYER_INTENSITY, MAX_PEEKS, MAX_TRIES, PEEK_COSTS, POINTS_BY_TRY, TIER_MULTIPLIER } from "./config.js";
 import { checkGuess, normalizeTitle } from "./matching.js";
 
 /** Points for solving on a given try after a number of peeks. */
 export function pointsFor(tryNumber, peeks) {
   const base = POINTS_BY_TRY[tryNumber - 1] ?? 0;
-  return Math.round(base * (1 - PEEK_COST * peeks));
+  const peekCost = PEEK_COSTS.slice(0, peeks).reduce((total, cost) => total + cost, 0);
+  return Math.round(base * (1 - peekCost));
 }
 
 /** Layer strengths for a tier: harder tracks get stronger distortion. */
