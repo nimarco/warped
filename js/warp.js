@@ -2,19 +2,20 @@
  * warp.js — BROWSER API: Web Audio API
  * https://developer.mozilla.org/docs/Web/API/Web_Audio_API
  *
- * Plays a song preview through a chain of live effects ("layers"):
+ * Plays a song preview through live "tape damage" effects (layers):
  *
- *   song → [karaoke] → [static] → [warble] → [muffled] → [beat] → analyser → speakers
+ *   reversed     the clip plays backwards (◀◀ REW)
+ *   fastforward  sped up, so it's higher and rushed (▶▶ FF)
+ *   melted       slowed down with a strong pitch wobble, like a tape left in the sun
+ *   chewed       the player "eats" the tape: stutters, skips and dropouts
+ *   static       bitcrush + tape hiss
+ *   warble       slowed down with a gentle pitch wobble
+ *   muffled      low-pass filter
  *
- *   karaoke   removes center-panned vocals (left minus right), keeps the bass
- *   static    bitcrush + tape hiss
- *   warble    slowed down with a wobbling pitch
- *   muffled   low-pass filter
- *   beat      very low low-pass: only bass and kick drum survive
- *
- * "Reversed" and "scrambled" change the audio itself instead of adding a node:
- * they play a backwards copy, or the clip cut into shuffled pieces.
- * Nothing is pre-rendered. Removing a layer just rebuilds the chain without it.
+ * The signal path is: song → [static] → [muffled] → analyser → speakers.
+ * Speed and pitch effects act on the song player itself, and "reversed" and
+ * "chewed" change which audio it plays. Nothing is pre-rendered: changing
+ * layers just rebuilds the chain.
  */
 
 import { CLIP_SECONDS } from "./config.js";
@@ -61,16 +62,20 @@ export function settingsFor(intensity) {
     wobbleHz: lerp(0.4, 1.4, i),
     // Low-pass cutoff in Hz (lower = more muffled). Exponential so it sounds even.
     cutoff: 2200 * Math.pow(250 / 2200, i),
-    // Beat only: from "bass and some body" (400 Hz) down to "just the thump" (70 Hz).
-    beatCutoff: 400 * Math.pow(70 / 400, i),
-    // Karaoke: how much of the vocal-cancelled mix replaces the original.
-    karaoke: lerp(0.6, 1, i),
-    // Scrambled: piece length in seconds (smaller pieces = harder).
-    chunkSeconds: lerp(1.4, 0.18, i),
+    // Fast-forward: 1.4× (like a "sped up" TikTok edit) up to 2.4× (chipmunk).
+    fastSpeed: lerp(1.4, 2.4, i),
+    // Melted: much slower and wobblier than warble, enough to bend the melody.
+    meltSpeed: lerp(0.88, 0.62, i),
+    meltCents: lerp(150, 800, i),
+    meltHz: lerp(0.5, 1.3, i),
+    // Chewed: chance that each bit of tape stutters, skips ahead or drops out.
+    stutterChance: lerp(0.12, 0.35, i),
+    skipChance: lerp(0.05, 0.2, i),
+    dropoutChance: lerp(0.04, 0.18, i),
   };
 }
 
-/** A tiny seeded random generator, so a scrambled clip sounds the same on every replay. */
+/** A tiny seeded random generator, so a chewed clip sounds the same on every replay. */
 function seededRandom(seed) {
   let state = seed >>> 0 || 1;
   return () => {
@@ -80,36 +85,58 @@ function seededRandom(seed) {
 }
 
 /**
- * Cut a section of a buffer into pieces and put them back in a shuffled order.
- * Each piece fades in and out over 10 ms so the cuts don't click.
+ * Build a "chewed tape" version of a clip: walk through it in short pieces,
+ * and for each piece either play it, stutter (repeat a tiny slice), skip it,
+ * or drop out to near silence. Every piece fades in and out so cuts don't click.
  */
-function scrambleBuffer(ctx, buffer, start, duration, chunkSeconds, seed) {
+function chewBuffer(ctx, buffer, start, duration, settings, seed) {
   const rate = buffer.sampleRate;
-  const startSample = Math.floor(start * rate);
-  const length = Math.min(Math.floor(duration * rate), buffer.length - startSample);
-  const chunk = Math.max(Math.floor(chunkSeconds * rate), 256);
-  const count = Math.ceil(length / chunk);
-  const fade = Math.min(Math.floor(rate * 0.01), Math.floor(chunk / 4));
-
-  const order = Array.from({ length: count }, (_, index) => index);
   const random = seededRandom(seed);
-  for (let index = order.length - 1; index > 0; index--) {
-    const swap = Math.floor(random() * (index + 1));
-    [order[index], order[swap]] = [order[swap], order[index]];
+  const seconds = (min, max) => Math.floor((min + random() * (max - min)) * rate);
+  const end = Math.min(Math.floor((start + duration) * rate), buffer.length);
+  let position = Math.floor(start * rate);
+
+  // Each entry: copy `length` samples from `from` (or silence if from is null).
+  const pieces = [];
+  while (position < end) {
+    const roll = random();
+    if (roll < settings.stutterChance) {
+      const slice = seconds(0.05, 0.12);
+      const repeats = 2 + Math.floor(random() * 3);
+      for (let count = 0; count < repeats; count++) {
+        pieces.push({ from: position, length: slice });
+      }
+      position += slice;
+    } else if (roll < settings.stutterChance + settings.skipChance) {
+      position += seconds(0.15, 0.4);
+    } else if (roll < settings.stutterChance + settings.skipChance + settings.dropoutChance) {
+      const gap = seconds(0.1, 0.25);
+      pieces.push({ from: null, length: gap });
+      position += gap;
+    } else {
+      const length = Math.min(seconds(0.2, 0.5), end - position);
+      pieces.push({ from: position, length });
+      position += length;
+    }
   }
 
-  const result = ctx.createBuffer(buffer.numberOfChannels, count * chunk, rate);
+  const total = pieces.reduce((sum, piece) => sum + piece.length, 0);
+  const result = ctx.createBuffer(buffer.numberOfChannels, Math.max(total, 1), rate);
+  const fade = Math.floor(rate * 0.006);
+
   for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
     const source = buffer.getChannelData(channel);
     const target = result.getChannelData(channel);
-    order.forEach((piece, slot) => {
-      for (let offset = 0; offset < chunk; offset++) {
-        const from = startSample + piece * chunk + offset;
-        const edge = Math.min(offset, chunk - 1 - offset);
+    let writeAt = 0;
+    for (const piece of pieces) {
+      for (let offset = 0; offset < piece.length; offset++) {
+        const edge = Math.min(offset, piece.length - 1 - offset);
         const envelope = edge < fade ? edge / fade : 1;
-        target[slot * chunk + offset] = from < startSample + length ? source[from] * envelope : 0;
+        const sample = piece.from === null ? 0 : source[Math.min(piece.from + offset, source.length - 1)];
+        target[writeAt + offset] = sample * envelope;
       }
-    });
+      writeAt += piece.length;
+    }
   }
   return result;
 }
@@ -248,7 +275,7 @@ export class WarpPlayer {
    * @param {number} options.start      where the clip starts in the preview (seconds)
    * @param {number} [options.duration] clip length in song seconds
    * @param {number} [options.volume]   0–1
-   * @param {number} [options.seed]     fixes the shuffle order for "scrambled"
+   * @param {number} [options.seed]     fixes where a "chewed" tape stutters and skips
    */
   play({ layers, intensity, start, duration = CLIP_SECONDS, volume = 0.9, seed = 1 }) {
     if (!this.buffer) {
@@ -267,12 +294,13 @@ export class WarpPlayer {
     const source = ctx.createBufferSource();
     let buffer = active.has("reversed") ? this.reversedBuffer : this.buffer;
     let offset = active.has("reversed") ? this.buffer.duration - clipStart - duration : clipStart;
+    let clipLength = duration;
 
-    // Scrambled: play a shuffled copy of just the clip, starting from its beginning.
-    if (active.has("scrambled")) {
-      const settings = settingsFor(levelFor("scrambled"));
-      buffer = scrambleBuffer(ctx, buffer, Math.max(offset, 0), duration, settings.chunkSeconds, seed);
+    // Chewed: play a damaged copy of just the clip, from its beginning.
+    if (active.has("chewed")) {
+      buffer = chewBuffer(ctx, buffer, Math.max(offset, 0), duration, settingsFor(levelFor("chewed")), seed);
       offset = 0;
+      clipLength = buffer.duration;
     }
     source.buffer = buffer;
 
@@ -282,48 +310,6 @@ export class WarpPlayer {
       chainEnd = node;
       this.nodes.push(node);
     };
-
-    // Keeping a few quiet layers at the same loudness as the full song.
-    let makeup = 1;
-
-    if (active.has("karaoke")) {
-      const settings = settingsFor(levelFor("karaoke"));
-      const input = chainEnd;
-
-      // Lead vocals sit in the center, equally loud in both ears.
-      // Left minus right cancels them and keeps what's panned to the sides.
-      const splitter = ctx.createChannelSplitter(2);
-      const left = ctx.createGain();
-      const invertedRight = ctx.createGain();
-      invertedRight.gain.value = -1;
-      const sides = ctx.createGain();
-      sides.gain.value = settings.karaoke * 1.4;
-      input.connect(splitter);
-      splitter.connect(left, 0);
-      splitter.connect(invertedRight, 1);
-      left.connect(sides);
-      invertedRight.connect(sides);
-
-      // The bass and kick are in the center too, so add the low end back in.
-      const bass = ctx.createBiquadFilter();
-      bass.type = "lowpass";
-      bass.frequency.value = 160;
-      const bassLevel = ctx.createGain();
-      bassLevel.gain.value = settings.karaoke;
-      input.connect(bass).connect(bassLevel);
-
-      // Blend in some of the original when the effect isn't at full strength.
-      const original = ctx.createGain();
-      original.gain.value = 1 - settings.karaoke;
-      input.connect(original);
-
-      const mix = ctx.createGain();
-      sides.connect(mix);
-      bassLevel.connect(mix);
-      original.connect(mix);
-      this.nodes.push(splitter, left, invertedRight, sides, bass, bassLevel, original, mix);
-      chainEnd = mix;
-    }
 
     if (active.has("static")) {
       const settings = settingsFor(levelFor("static"));
@@ -344,21 +330,35 @@ export class WarpPlayer {
       this.nodes.push(hiss, hissFilter, hissGain);
     }
 
-    let speed = 1;
-    if (active.has("warble")) {
-      const settings = settingsFor(levelFor("warble"));
-      speed = settings.speed;
-      source.playbackRate.value = speed;
-
-      // A slow oscillator bends the pitch up and down, like a warped record.
+    // A slow oscillator bends the pitch up and down, like a warped record.
+    const addWobble = (frequency, cents) => {
       const wobble = ctx.createOscillator();
-      wobble.frequency.value = settings.wobbleHz;
+      wobble.frequency.value = frequency;
       const wobbleDepth = ctx.createGain();
-      wobbleDepth.gain.value = settings.wobbleCents;
+      wobbleDepth.gain.value = cents;
       wobble.connect(wobbleDepth).connect(source.detune);
       wobble.start();
       this.nodes.push(wobble, wobbleDepth);
+    };
+
+    // Speed effects multiply: playing faster also raises the pitch, like a real tape.
+    let speed = 1;
+    if (active.has("fastforward")) {
+      speed *= settingsFor(levelFor("fastforward")).fastSpeed;
     }
+    if (active.has("melted")) {
+      const settings = settingsFor(levelFor("melted"));
+      speed *= settings.meltSpeed;
+      // Two wobbles at unrelated speeds make the drift feel uneven, not like a steady siren.
+      addWobble(settings.meltHz, settings.meltCents * 0.65);
+      addWobble(settings.meltHz * 0.37, settings.meltCents * 0.35);
+    }
+    if (active.has("warble")) {
+      const settings = settingsFor(levelFor("warble"));
+      speed *= settings.speed;
+      addWobble(settings.wobbleHz, settings.wobbleCents);
+    }
+    source.playbackRate.value = speed;
 
     if (active.has("muffled")) {
       const settings = settingsFor(levelFor("muffled"));
@@ -369,27 +369,13 @@ export class WarpPlayer {
       connect(lowpass);
     }
 
-    if (active.has("beat")) {
-      // Two filters in a row give a steep cut, so the melody really disappears.
-      const settings = settingsFor(levelFor("beat"));
-      for (let pass = 0; pass < 2; pass++) {
-        const lowpass = ctx.createBiquadFilter();
-        lowpass.type = "lowpass";
-        lowpass.frequency.value = settings.beatCutoff;
-        lowpass.Q.value = 0.7;
-        connect(lowpass);
-      }
-      makeup = 1.8;
-    }
-
     // Short fades at both ends prevent clicks.
-    const realLength = duration / speed;
-    const level = volume * makeup;
+    const realLength = clipLength / speed;
     const envelope = ctx.createGain();
     const now = ctx.currentTime;
     envelope.gain.setValueAtTime(0, now);
-    envelope.gain.linearRampToValueAtTime(level, now + FADE_SECONDS);
-    envelope.gain.setValueAtTime(level, now + realLength - FADE_SECONDS);
+    envelope.gain.linearRampToValueAtTime(volume, now + FADE_SECONDS);
+    envelope.gain.setValueAtTime(volume, now + realLength - FADE_SECONDS);
     envelope.gain.linearRampToValueAtTime(0, now + realLength);
     connect(envelope);
     chainEnd.connect(this.output);
@@ -401,7 +387,7 @@ export class WarpPlayer {
       }
     };
 
-    source.start(now, Math.max(offset, 0), duration);
+    source.start(now, Math.max(offset, 0), clipLength);
     this.source = source;
     this.nodes.push(source);
     this.playing = true;
