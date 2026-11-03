@@ -1,0 +1,31 @@
+# Only the website itself (index.html, style.css, js/, data/, assets/, README.md)
+# is committed. Everything below is local-only.
+
+# Planning and dev tools
+PLAN.md
+ASSIGNMENT.md
+lab/
+.claude/
+CLAUDE.md
+
+# Submission ZIPs
+*.zip
+
+# Secrets and environment files
+.env
+.env.*
+
+# Dependencies and logs (in case any tooling is added later)
+node_modules/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*~
