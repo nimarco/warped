@@ -4,12 +4,12 @@
  * the game rules, storage and the page. Handles both Daily and Free Play.
  */
 
-import { LAYER_LABELS, LAYER_ORDER, MAX_TRIES, TIER_NAMES, TRACKS_PER_DAY } from "./config.js";
+import { BUSY_RETRIES, BUSY_RETRY_MS, LAYER_LABELS, LAYER_ORDER, MAX_TRIES, TIER_NAMES, TRACKS_PER_DAY } from "./config.js";
 import { SONGS } from "../data/songs.js";
 import { Autocomplete } from "./autocomplete.js";
 import { availableDecades, getDailyLineup, getPuzzleNumber, msUntilNextPuzzle, pickFreePlaySong } from "./daily.js";
 import { intensityForTier, TrackRound } from "./game.js";
-import { findMusicVideo, lookupSong, searchSongs } from "./itunes.js";
+import { findMusicVideo, lookupSongs, searchSongs } from "./itunes.js";
 import { drawPixelated } from "./peek.js";
 import { buildShareText, copyText } from "./share.js";
 import {
@@ -51,12 +51,40 @@ const app = {
 
 /* ---------- Loading a track ---------- */
 
-/** Look up a song and download its audio. Tries backups if one fails. */
+/**
+ * iTunes data for a track's songs. Daily mode looks up every track and backup
+ * for the day in one request and saves the answer with the day's progress,
+ * so later tracks and reloads don't ask iTunes again.
+ */
+async function lookupCandidates(candidates) {
+  if (app.mode === "free") {
+    return lookupSongs(candidates.map((entry) => entry.id));
+  }
+  const known = app.day.songs ?? [];
+  if (candidates.some((entry) => known.some((song) => song.id === entry.id))) {
+    return known;
+  }
+  app.day.songs = await lookupSongs([...lineup.flat(), ...candidates].map((entry) => entry.id));
+  saveDay(app.day);
+  return app.day.songs;
+}
+
+/**
+ * Download the first candidate that plays. A backup only replaces a song that
+ * is broken (gone from iTunes, no preview, bad audio). If iTunes can't be
+ * reached, this fails before trying any backups, so a busy network never
+ * gives one player a different daily song than everyone else.
+ */
 async function loadSong(candidates) {
-  let lastError = null;
+  const songs = await lookupCandidates(candidates);
+  let lastError = new Error("This track isn't available right now.");
+
   for (const entry of candidates) {
+    const song = songs.find((item) => item.id === entry.id);
+    if (!song) {
+      continue;
+    }
     try {
-      const song = await lookupSong(entry.id);
       await player.load(song.previewUrl);
       // The catalog's release year is the original one; iTunes may list a later re-release.
       return { ...song, year: entry.year, tier: entry.tier };
@@ -64,11 +92,11 @@ async function loadSong(candidates) {
       lastError = error;
     }
   }
-  throw lastError ?? new Error("Couldn't load a song.");
+  throw lastError;
 }
 
 /** Get a track ready to play: restore its progress, reset the screen. */
-async function startTrack(candidates, tier, saved) {
+async function startTrack(candidates, tier, saved, attempt = 1) {
   const loadId = ++app.loadId;
   stopClip();
   autocomplete.clear();
@@ -110,6 +138,16 @@ async function startTrack(candidates, tier, saved) {
     }
   } catch (error) {
     if (loadId !== app.loadId) {
+      return;
+    }
+    // iTunes is turning this network away for a few seconds: wait, then try again.
+    if (error.busy && attempt <= BUSY_RETRIES) {
+      ui.setTvStatus({ text: "The music library is busy. Trying again in a few seconds…", loading: true });
+      setTimeout(() => {
+        if (loadId === app.loadId) {
+          startTrack(candidates, tier, saved, attempt + 1);
+        }
+      }, BUSY_RETRY_MS);
       return;
     }
     ui.setTvStatus({ text: error.message, retry: true });
@@ -327,10 +365,11 @@ async function peekVideo() {
 async function showVideoOrCover(round) {
   ui.setTvStatus({ text: "Finding the video…", loading: true });
   let videoUrl = null;
+  let fallbackMessage = "No music video for this one. Here's the clear cover instead.";
   try {
     videoUrl = await findMusicVideo(round.song.title, round.song.artist);
   } catch {
-    videoUrl = null;
+    fallbackMessage = "Couldn't load the video right now. Here's the clear cover instead.";
   }
   ui.setTvStatus(null);
   if (app.round !== round || round.isOver) {
@@ -342,7 +381,7 @@ async function showVideoOrCover(round) {
     ui.showPicture("video");
     elements.peekVideo.play().catch(() => ui.showPicture("art", coverFor(round.song, true)));
   } else {
-    ui.toast("No music video for this one. Here's the clear cover instead.");
+    ui.toast(fallbackMessage);
     ui.showPicture("art", coverFor(round.song, true));
   }
 }

@@ -27,11 +27,13 @@ After four songs you get a score out of 1000, a streak, and a spoiler-free emoji
 
 ### When something fails
 
-- **iTunes is down or a preview is missing:** the game tries a backup song, then shows a friendly message with a Try again button.
+- **A preview is missing or broken:** the game swaps in a backup song from the same tier.
+- **iTunes can't be reached:** the game shows a friendly message with a Try again button. It doesn't switch to a backup song, so everyone still gets the same daily songs.
+- **Too many players on one network:** iTunes allows only so many requests a minute from one IP address (a campus Wi-Fi can be a whole class), and its "slow down" reply looks like a network error to the browser. If the device is online, the game says the music library is busy and tries again every 12 seconds, up to three times. To stay under the limit, it looks up all of the day's songs in one request and saves them with the day's progress. Typing more of a search narrows the results it already has instead of searching again.
 - **Audio is blocked until a click:** the game waits for the Press play button. iPhone players get a tip about the silent switch.
 - **Storage is blocked** (private browsing): the game still works, and the stats screen explains that nothing will be saved.
 - **Clipboard is blocked:** the result appears in a text box to copy by hand.
-- **No music video exists:** the second peek shows the clear album cover instead.
+- **No music video exists, or it won't load:** the second peek shows the clear album cover instead.
 
 ## How it works
 

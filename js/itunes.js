@@ -17,12 +17,35 @@ const JUNK_PATTERN =
 
 const cache = new Map();
 
-/** A friendly error the UI can show directly. */
+/** A friendly error the UI can show directly. `busy` means trying again soon should work. */
 export class ItunesError extends Error {
-  constructor(message) {
+  constructor(message, { busy = false } = {}) {
     super(message);
     this.name = "ItunesError";
+    this.busy = busy;
   }
+}
+
+function busyError() {
+  return new ItunesError(
+    "Couldn't reach the music library. It may be busy, or blocked on this network. Try again in a minute.",
+    { busy: true }
+  );
+}
+
+/** Turn a failed fetch into an error that says what most likely went wrong. */
+function requestError(error) {
+  if (!navigator.onLine) {
+    return new ItunesError("You're offline. Check your connection and try again.");
+  }
+  if (error.name === "TimeoutError") {
+    return new ItunesError("The music library is taking too long to answer. Check your connection and try again.");
+  }
+  // iTunes allows only so many requests a minute from one network, and a
+  // campus Wi-Fi can be a whole class. Its "too many requests" reply has no
+  // CORS header, so the browser can't read it and reports a network error
+  // instead. Online but unreachable usually means that, so it's worth a retry.
+  return busyError();
 }
 
 /** Fetch JSON from iTunes with a timeout and a cache. */
@@ -37,12 +60,12 @@ async function getJson(path, params) {
   let response;
   try {
     response = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
-  } catch {
-    throw new ItunesError("Couldn't reach the music library. Check your connection and try again.");
+  } catch (error) {
+    throw requestError(error);
   }
 
   if (!response.ok) {
-    throw new ItunesError("The music library is busy right now. Give it a few seconds and try again.");
+    throw busyError();
   }
 
   const data = await response.json();
@@ -65,20 +88,17 @@ function toSong(result) {
   };
 }
 
-/** Look up one song by its iTunes track ID. */
-export async function lookupSong(id) {
-  const data = await getJson("lookup", { id, entity: "song" });
-  const result = data.results.find((item) => item.kind === "song");
-
-  if (!result || !result.previewUrl) {
-    throw new ItunesError("This song's preview isn't available right now.");
-  }
-
-  return toSong(result);
+/**
+ * Look up songs by iTunes track ID, all in one request.
+ * Songs that are gone from iTunes or have no preview are left out.
+ */
+export async function lookupSongs(ids) {
+  const data = await getJson("lookup", { id: [...new Set(ids)].join(","), entity: "song" });
+  return data.results.filter((item) => item.kind === "song" && item.previewUrl).map(toSong);
 }
 
-/** Search songs for the guess autocomplete. Skips covers and duplicates. */
-export async function searchSongs(term, limit = 8) {
+/** Search songs for the guess autocomplete, best matches first. Skips covers and duplicates. */
+export async function searchSongs(term) {
   const trimmed = term.trim();
   if (trimmed.length < 2) {
     return [];
@@ -112,10 +132,6 @@ export async function searchSongs(term, limit = 8) {
     if (!seen.has(key)) {
       seen.add(key);
       songs.push(toSong(result));
-    }
-
-    if (songs.length === limit) {
-      break;
     }
   }
 
