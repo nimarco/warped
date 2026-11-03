@@ -4,9 +4,16 @@
  *
  * Plays a song preview through a chain of live effects ("layers"):
  *
- *   song → [static: bitcrush + hiss] → [warble: slow + wobble] → [muffled: low-pass] → analyser → speakers
+ *   song → [karaoke] → [static] → [warble] → [muffled] → [beat] → analyser → speakers
  *
- * "Reversed" isn't an effect node: it plays a backwards copy of the audio.
+ *   karaoke   removes center-panned vocals (left minus right), keeps the bass
+ *   static    bitcrush + tape hiss
+ *   warble    slowed down with a wobbling pitch
+ *   muffled   low-pass filter
+ *   beat      very low low-pass: only bass and kick drum survive
+ *
+ * "Reversed" and "scrambled" change the audio itself instead of adding a node:
+ * they play a backwards copy, or the clip cut into shuffled pieces.
  * Nothing is pre-rendered. Removing a layer just rebuilds the chain without it.
  */
 
@@ -54,7 +61,57 @@ export function settingsFor(intensity) {
     wobbleHz: lerp(0.4, 1.4, i),
     // Low-pass cutoff in Hz (lower = more muffled). Exponential so it sounds even.
     cutoff: 2200 * Math.pow(250 / 2200, i),
+    // Beat only: from "bass and some body" (400 Hz) down to "just the thump" (70 Hz).
+    beatCutoff: 400 * Math.pow(70 / 400, i),
+    // Karaoke: how much of the vocal-cancelled mix replaces the original.
+    karaoke: lerp(0.6, 1, i),
+    // Scrambled: piece length in seconds (smaller pieces = harder).
+    chunkSeconds: lerp(1.4, 0.18, i),
   };
+}
+
+/** A tiny seeded random generator, so a scrambled clip sounds the same on every replay. */
+function seededRandom(seed) {
+  let state = seed >>> 0 || 1;
+  return () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+}
+
+/**
+ * Cut a section of a buffer into pieces and put them back in a shuffled order.
+ * Each piece fades in and out over 10 ms so the cuts don't click.
+ */
+function scrambleBuffer(ctx, buffer, start, duration, chunkSeconds, seed) {
+  const rate = buffer.sampleRate;
+  const startSample = Math.floor(start * rate);
+  const length = Math.min(Math.floor(duration * rate), buffer.length - startSample);
+  const chunk = Math.max(Math.floor(chunkSeconds * rate), 256);
+  const count = Math.ceil(length / chunk);
+  const fade = Math.min(Math.floor(rate * 0.01), Math.floor(chunk / 4));
+
+  const order = Array.from({ length: count }, (_, index) => index);
+  const random = seededRandom(seed);
+  for (let index = order.length - 1; index > 0; index--) {
+    const swap = Math.floor(random() * (index + 1));
+    [order[index], order[swap]] = [order[swap], order[index]];
+  }
+
+  const result = ctx.createBuffer(buffer.numberOfChannels, count * chunk, rate);
+  for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+    const source = buffer.getChannelData(channel);
+    const target = result.getChannelData(channel);
+    order.forEach((piece, slot) => {
+      for (let offset = 0; offset < chunk; offset++) {
+        const from = startSample + piece * chunk + offset;
+        const edge = Math.min(offset, chunk - 1 - offset);
+        const envelope = edge < fade ? edge / fade : 1;
+        target[slot * chunk + offset] = from < startSample + length ? source[from] * envelope : 0;
+      }
+    });
+  }
+  return result;
 }
 
 /** A curve that snaps the waveform to a few levels (a bitcrusher). */
@@ -191,8 +248,9 @@ export class WarpPlayer {
    * @param {number} options.start      where the clip starts in the preview (seconds)
    * @param {number} [options.duration] clip length in song seconds
    * @param {number} [options.volume]   0–1
+   * @param {number} [options.seed]     fixes the shuffle order for "scrambled"
    */
-  play({ layers, intensity, start, duration = CLIP_SECONDS, volume = 0.9 }) {
+  play({ layers, intensity, start, duration = CLIP_SECONDS, volume = 0.9, seed = 1 }) {
     if (!this.buffer) {
       return;
     }
@@ -207,8 +265,16 @@ export class WarpPlayer {
 
     // The source: forwards or backwards. A reversed clip covers the same section of the song.
     const source = ctx.createBufferSource();
-    source.buffer = active.has("reversed") ? this.reversedBuffer : this.buffer;
-    const offset = active.has("reversed") ? this.buffer.duration - clipStart - duration : clipStart;
+    let buffer = active.has("reversed") ? this.reversedBuffer : this.buffer;
+    let offset = active.has("reversed") ? this.buffer.duration - clipStart - duration : clipStart;
+
+    // Scrambled: play a shuffled copy of just the clip, starting from its beginning.
+    if (active.has("scrambled")) {
+      const settings = settingsFor(levelFor("scrambled"));
+      buffer = scrambleBuffer(ctx, buffer, Math.max(offset, 0), duration, settings.chunkSeconds, seed);
+      offset = 0;
+    }
+    source.buffer = buffer;
 
     let chainEnd = source;
     const connect = (node) => {
@@ -216,6 +282,48 @@ export class WarpPlayer {
       chainEnd = node;
       this.nodes.push(node);
     };
+
+    // Keeping a few quiet layers at the same loudness as the full song.
+    let makeup = 1;
+
+    if (active.has("karaoke")) {
+      const settings = settingsFor(levelFor("karaoke"));
+      const input = chainEnd;
+
+      // Lead vocals sit in the center, equally loud in both ears.
+      // Left minus right cancels them and keeps what's panned to the sides.
+      const splitter = ctx.createChannelSplitter(2);
+      const left = ctx.createGain();
+      const invertedRight = ctx.createGain();
+      invertedRight.gain.value = -1;
+      const sides = ctx.createGain();
+      sides.gain.value = settings.karaoke * 1.4;
+      input.connect(splitter);
+      splitter.connect(left, 0);
+      splitter.connect(invertedRight, 1);
+      left.connect(sides);
+      invertedRight.connect(sides);
+
+      // The bass and kick are in the center too, so add the low end back in.
+      const bass = ctx.createBiquadFilter();
+      bass.type = "lowpass";
+      bass.frequency.value = 160;
+      const bassLevel = ctx.createGain();
+      bassLevel.gain.value = settings.karaoke;
+      input.connect(bass).connect(bassLevel);
+
+      // Blend in some of the original when the effect isn't at full strength.
+      const original = ctx.createGain();
+      original.gain.value = 1 - settings.karaoke;
+      input.connect(original);
+
+      const mix = ctx.createGain();
+      sides.connect(mix);
+      bassLevel.connect(mix);
+      original.connect(mix);
+      this.nodes.push(splitter, left, invertedRight, sides, bass, bassLevel, original, mix);
+      chainEnd = mix;
+    }
 
     if (active.has("static")) {
       const settings = settingsFor(levelFor("static"));
@@ -261,13 +369,27 @@ export class WarpPlayer {
       connect(lowpass);
     }
 
+    if (active.has("beat")) {
+      // Two filters in a row give a steep cut, so the melody really disappears.
+      const settings = settingsFor(levelFor("beat"));
+      for (let pass = 0; pass < 2; pass++) {
+        const lowpass = ctx.createBiquadFilter();
+        lowpass.type = "lowpass";
+        lowpass.frequency.value = settings.beatCutoff;
+        lowpass.Q.value = 0.7;
+        connect(lowpass);
+      }
+      makeup = 1.8;
+    }
+
     // Short fades at both ends prevent clicks.
     const realLength = duration / speed;
+    const level = volume * makeup;
     const envelope = ctx.createGain();
     const now = ctx.currentTime;
     envelope.gain.setValueAtTime(0, now);
-    envelope.gain.linearRampToValueAtTime(volume, now + FADE_SECONDS);
-    envelope.gain.setValueAtTime(volume, now + realLength - FADE_SECONDS);
+    envelope.gain.linearRampToValueAtTime(level, now + FADE_SECONDS);
+    envelope.gain.setValueAtTime(level, now + realLength - FADE_SECONDS);
     envelope.gain.linearRampToValueAtTime(0, now + realLength);
     connect(envelope);
     chainEnd.connect(this.output);
