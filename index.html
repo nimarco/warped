@@ -2,13 +2,244 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Warped</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Warped · The daily song game</title>
+  <meta name="description" content="Name the song before it un-warps. Four songs a day, starting reversed, crunchy, wobbly and muffled. Every wrong guess makes it clearer.">
+  <meta name="theme-color" content="#0e0c10">
+
+  <meta property="og:title" content="Warped · The daily song game">
+  <meta property="og:description" content="Four songs a day, badly warped. Every wrong guess makes them clearer.">
+  <meta property="og:type" content="website">
+
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=VT323&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="js/main.js"></script>
 </head>
 <body>
-  <main>
-    <h1>Warped</h1>
-    <p>Coming soon.</p>
+  <a class="skip-link" href="#game">Skip to the game</a>
+
+  <header class="topbar">
+    <a class="logo" href="./" aria-label="Warped home">
+      <span class="logo-text" data-text="WARPED">WARPED</span>
+    </a>
+
+    <nav class="mode-switch" aria-label="Game mode">
+      <button class="mode-button" type="button" data-mode="daily" aria-pressed="true">Daily</button>
+      <button class="mode-button" type="button" data-mode="free" aria-pressed="false">Free Play</button>
+    </nav>
+
+    <div class="topbar-actions">
+      <button class="icon-button" id="help-button" type="button" aria-label="How to play">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.2 1-1.2 1.9v.5"/><circle class="dot" cx="12" cy="17.2" r="1"/></svg>
+      </button>
+      <button class="icon-button" id="stats-button" type="button" aria-label="Your stats">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V12M12 20V5M19 20v-6"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="game" class="game" tabindex="-1">
+
+    <!-- Intro: shown before today's tape starts -->
+    <section class="screen intro" id="intro-screen" aria-labelledby="intro-title">
+      <p class="eyebrow">Daily tape <span class="mono" id="intro-number">#1</span> · <span id="intro-date"></span></p>
+      <h1 class="intro-title" id="intro-title">Name the song<br>before it <span class="glitch" data-text="un-warps">un-warps</span>.</h1>
+      <p class="intro-lede">Four songs. Each one starts reversed, crunchy, wobbly and muffled. Every wrong guess peels off a layer, and the fewer layers you need, the more you score.</p>
+
+      <ol class="intro-layers" aria-label="The four layers, removed in this order">
+        <li class="chip" data-layer="reversed">Reversed</li>
+        <li class="chip" data-layer="static">Static</li>
+        <li class="chip" data-layer="warble">Warble</li>
+        <li class="chip" data-layer="muffled">Muffled</li>
+      </ol>
+
+      <button class="button button-primary button-big" id="start-button" type="button">
+        <svg class="icon-solid" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>
+        <span id="start-label">Press play</span>
+      </button>
+      <p class="intro-note" id="intro-note">Sound on. Headphones help.</p>
+    </section>
+
+    <!-- Play: the deck, used by both Daily and Free Play -->
+    <section class="screen play" id="play-screen" aria-label="Current track" hidden>
+
+      <ol class="track-progress" id="track-progress" aria-label="Today's tracks"></ol>
+
+      <div class="free-bar" id="free-bar" hidden>
+        <label class="free-label" for="decade-select">Era</label>
+        <select class="select" id="decade-select"></select>
+        <p class="free-score">Session <strong id="free-score">0</strong> pts · <span id="free-count">0 songs</span></p>
+      </div>
+
+      <div class="deck">
+        <div class="tv" id="tv">
+          <canvas class="tv-visualizer" id="visualizer" aria-hidden="true"></canvas>
+          <canvas class="tv-picture" id="peek-canvas" role="img" aria-label="Pixelated album cover hint" hidden></canvas>
+          <video class="tv-picture" id="peek-video" muted playsinline loop aria-label="Music video hint" hidden></video>
+          <div class="tv-glass" aria-hidden="true"></div>
+
+          <p class="osd osd-state" id="osd-state" aria-hidden="true">STOP ■</p>
+          <p class="osd osd-track" id="osd-track" aria-hidden="true"></p>
+          <p class="osd osd-time" id="osd-time" aria-hidden="true">0:00</p>
+
+          <div class="tv-status" id="tv-status" hidden>
+            <p class="tv-status-text" id="tv-status-text">Loading tape…</p>
+            <button class="button button-small" id="retry-button" type="button" hidden>Try again</button>
+          </div>
+        </div>
+
+        <ol class="layers" id="layers" aria-label="Distortion layers still on"></ol>
+
+        <div class="transport">
+          <button class="play-button" id="play-button" type="button" aria-label="Play the clip" disabled>
+            <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>
+            <svg class="icon-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/></svg>
+          </button>
+          <div class="progress" aria-hidden="true"><div class="progress-fill" id="progress-fill"></div></div>
+          <p class="worth">Worth <strong id="worth">250</strong></p>
+        </div>
+        <p class="silent-tip" id="silent-tip" hidden>No sound? Check your phone's silent switch.</p>
+      </div>
+
+      <!-- Guessing -->
+      <div class="guess-area" id="guess-area">
+        <form class="guess-form" id="guess-form" autocomplete="off">
+          <label class="visually-hidden" for="guess-input">Guess the song</label>
+          <div class="combo">
+            <svg class="combo-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+            <input class="guess-input" id="guess-input" type="text" placeholder="Search a song or artist…"
+                   role="combobox" aria-expanded="false" aria-controls="suggestions" aria-autocomplete="list" spellcheck="false" disabled>
+            <ul class="suggestions" id="suggestions" role="listbox" aria-label="Matching songs" hidden></ul>
+          </div>
+          <div class="guess-buttons">
+            <button class="button button-ghost" id="skip-button" type="button" disabled>Skip</button>
+            <button class="button button-primary" id="guess-button" type="submit" disabled>Guess</button>
+          </div>
+        </form>
+
+        <p class="message" id="message" role="status" aria-live="polite"></p>
+
+        <ol class="guesses" id="guesses" aria-label="Your guesses"></ol>
+
+        <div class="peeks">
+          <p class="peeks-label">Stuck? Peek <span>(each costs 25%)</span></p>
+          <div class="peeks-buttons">
+            <button class="button button-peek" id="peek-art-button" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12h16M12 4v16"/></svg>
+              Blurry cover
+            </button>
+            <button class="button button-peek" id="peek-video-button" type="button" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg>
+              Music video
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reveal: replaces the guess area when a track ends -->
+      <div class="reveal" id="reveal" hidden>
+        <p class="eyebrow reveal-eyebrow" id="reveal-eyebrow">You got it</p>
+        <h2 class="reveal-title" id="reveal-title">Song title</h2>
+        <p class="reveal-meta" id="reveal-meta"></p>
+        <p class="reveal-points" id="reveal-points"></p>
+        <div class="reveal-actions">
+          <a class="button button-ghost" id="store-link" href="https://music.apple.com" target="_blank" rel="noopener">
+            Listen on Apple Music
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16 16 8M9 8h7v7"/></svg>
+          </a>
+          <button class="button button-primary" id="next-button" type="button">Next track</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Summary: end of the daily tape -->
+    <section class="screen summary" id="summary-screen" aria-labelledby="summary-title" hidden>
+      <p class="eyebrow">Daily tape <span class="mono" id="summary-number">#1</span> · complete</p>
+      <h2 class="summary-title" id="summary-title"><span id="summary-score">0</span><span class="summary-max">/1000</span></h2>
+      <p class="summary-verdict" id="summary-verdict"></p>
+
+      <ol class="summary-tracks" id="summary-tracks"></ol>
+
+      <div class="summary-share">
+        <button class="button button-primary button-big" id="share-button" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>
+          Copy my result
+        </button>
+        <div class="share-fallback" id="share-fallback" hidden>
+          <label for="share-text">Copying is blocked here. Select the text and copy it yourself:</label>
+          <textarea class="share-text" id="share-text" rows="7" readonly></textarea>
+        </div>
+      </div>
+
+      <dl class="summary-stats">
+        <div><dt>Streak</dt><dd id="summary-streak">0</dd></div>
+        <div><dt>Next tape in</dt><dd id="countdown">--:--:--</dd></div>
+      </dl>
+
+      <button class="button button-ghost" id="free-play-button" type="button">Keep playing in Free Play</button>
+    </section>
   </main>
+
+  <footer class="footer">
+    <p>Song previews courtesy of Apple Music · Made for CSE 2004</p>
+  </footer>
+
+  <!-- How to play -->
+  <dialog class="dialog" id="help-dialog" aria-labelledby="help-title">
+    <form method="dialog" class="dialog-close-form">
+      <button class="icon-button" type="submit" aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+      </button>
+    </form>
+    <h2 class="dialog-title" id="help-title">How to play</h2>
+    <ol class="help-steps">
+      <li>
+        <strong>Press play.</strong> You'll hear 10 seconds of a song, badly warped. Replay it as often as you like.
+      </li>
+      <li>
+        <strong>Guess the song.</strong> Search by title or artist and pick from the list. Each wrong guess or skip removes a layer:
+        <span class="help-layers">
+          <span class="chip chip-small" data-layer="reversed">Reversed</span>
+          <span class="chip chip-small" data-layer="static">Static</span>
+          <span class="chip chip-small" data-layer="warble">Warble</span>
+          <span class="chip chip-small" data-layer="muffled">Muffled</span>
+        </span>
+      </li>
+      <li>
+        <strong>Score.</strong> 250 points on try 1, then 200, 150, 100 and 50 on the clean song. Peeking at the cover or video costs 25% each.
+      </li>
+    </ol>
+    <p class="help-legend">
+      <span><span class="legend-box legend-correct"></span>Correct</span>
+      <span><span class="legend-box legend-partial"></span>Right artist or title</span>
+      <span><span class="legend-box legend-wrong"></span>Wrong</span>
+      <span><span class="legend-box legend-skip"></span>Skipped</span>
+    </p>
+    <p class="help-footnote">A new tape of four songs drops every day at midnight. Free Play is unlimited and doesn't count toward your stats.</p>
+  </dialog>
+
+  <!-- Stats -->
+  <dialog class="dialog" id="stats-dialog" aria-labelledby="stats-title">
+    <form method="dialog" class="dialog-close-form">
+      <button class="icon-button" type="submit" aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+      </button>
+    </form>
+    <h2 class="dialog-title" id="stats-title">Your stats</h2>
+    <dl class="stats-grid">
+      <div><dt>Played</dt><dd id="stat-played">0</dd></div>
+      <div><dt>Avg score</dt><dd id="stat-average">0</dd></div>
+      <div><dt>Streak</dt><dd id="stat-streak">0</dd></div>
+      <div><dt>Best streak</dt><dd id="stat-max-streak">0</dd></div>
+    </dl>
+    <h3 class="stats-subtitle">Songs solved on try</h3>
+    <ol class="distribution" id="distribution"></ol>
+    <p class="stats-note" id="stats-note" hidden>Your browser is blocking storage, so stats won't be saved.</p>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </body>
 </html>
