@@ -13,7 +13,7 @@ const BASE_URL = "https://itunes.apple.com";
 
 // Words that mark a result as a cover, karaoke or remix rather than the real song.
 const JUNK_PATTERN =
-  /karaoke|tribute|instrumental|cover|made famous|in the style of|workout|lullaby|lullapop|rockabye|kidz bop|8-bit|remix|sped up|slowed|arrangement|piano|string quartet|vitamin string|orchestra|\(live|- live|live at|live from|live in /i;
+  /karaoke|tribute|instrumental|cover|made famous|in the style of|workout|lullaby|lullapop|rockabye|kidz bop|8-bit|remix|sped up|slowed|arrangement|piano|string quartet|vitamin string|orchestra|\(live|- live|live at|live from|live in |glee cast|the voice performance|music sessions|country version|postmodern jukebox/i;
 
 const cache = new Map();
 
@@ -85,17 +85,30 @@ export async function searchSongs(term, limit = 8) {
   }
 
   const data = await getJson("search", { term: trimmed, media: "music", entity: "song", limit: 25 });
+  const results = data.results.filter(
+    (result) =>
+      result.kind === "song" && !JUNK_PATTERN.test(`${result.trackName} ${result.collectionName} ${result.artistName}`)
+  );
+  const artistNames = new Set(results.map((result) => splitArtists(result.artistName)[0]));
   const seen = new Set();
   const songs = [];
 
-  for (const result of data.results) {
-    const text = `${result.trackName} ${result.collectionName} ${result.artistName}`;
-    if (result.kind !== "song" || JUNK_PATTERN.test(text)) {
+  for (const result of results) {
+    const title = normalizeTitle(result.trackName);
+    const artist = splitArtists(result.artistName)[0];
+
+    // Knockoffs often put the real artist in the title ("Blinding Lights The Weeknd").
+    const namesOtherArtist = [...artistNames].some(
+      (name) => name !== artist && name.length > 3 && title.includes(name)
+    );
+    if (namesOtherArtist) {
       continue;
     }
 
-    // iTunes ranks the original first, so later songs with the same title are usually covers.
-    const key = normalizeTitle(result.trackName);
+    // Different songs can share a title ("Stay" by Rihanna and by The Kid LAROI),
+    // so a song is a duplicate only if both the title and the artist match.
+    const key = `${title}|${artist}`;
+    // iTunes orders results by popularity, so the songs people mean come first.
     if (!seen.has(key)) {
       seen.add(key);
       songs.push(toSong(result));
