@@ -42,11 +42,13 @@ After four songs you get a score out of 1000, a streak, and a spoiler-free emoji
 - **The clip is the chorus.** The game measures loudness across the preview and plays the loudest 10 seconds.
 - **Guesses are matched by cleaned-up title and artist,** because one song has many iTunes IDs (single, album, remaster).
 - **The song list stores only iTunes IDs,** so reading the source doesn't spoil answers.
+- **Difficulty comes from the charts.** The pool is every clean song from Billboard's Year-End Hot 100 top 40, 1970–2025, plus a few classics that never placed there. A song's tier depends on its year-end rank and how long ago it was a hit: a top-10 hit from 2000 on is Easy, a 1970s song outside the top 10 is Expert.
+- **Free Play can't spoil Daily.** It skips every song Daily will play in the next 60 days.
 
 ```
 index.html        page structure
 style.css         all styling (VHS look; colors and fonts are CSS variables)
-data/songs.js     curated song pool (iTunes IDs, difficulty tier, year)
+data/songs.js     song pool (iTunes IDs, difficulty tier, year)
 js/main.js        starts the app and connects everything
 js/config.js      every tunable number (scoring, layer strength, timing)
 js/game.js        rules for one track (tries, layers, peeks, points)

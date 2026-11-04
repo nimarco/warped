@@ -5,7 +5,7 @@
  * on every device.
  */
 
-import { LAUNCH_DATE, TRACKS_PER_DAY } from "./config.js";
+import { FREE_PLAY_SKIPS_DAILY_DAYS, LAUNCH_DATE, TRACKS_PER_DAY } from "./config.js";
 import { SONGS } from "../data/songs.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -82,12 +82,33 @@ export function songsInDecade(decade) {
   return SONGS.filter((song) => decade === "all" || Math.floor(song.year / 10) * 10 === Number(decade));
 }
 
+let upcoming = { puzzle: null, ids: new Set() };
+
+/** IDs of the songs Daily will play from today through the next FREE_PLAY_SKIPS_DAILY_DAYS days. */
+function upcomingDailyIds() {
+  const today = getPuzzleNumber();
+  if (upcoming.puzzle !== today) {
+    const ids = new Set();
+    for (let day = today; day < today + FREE_PLAY_SKIPS_DAILY_DAYS; day++) {
+      for (const candidates of getDailyLineup(day)) {
+        ids.add(candidates[0].id);
+      }
+    }
+    upcoming = { puzzle: today, ids };
+  }
+  return upcoming.ids;
+}
+
 /**
  * A random Free Play song from a decade that isn't in `playedIds`, like
  * drawing from a shuffled deck. Null once every song there has been played.
+ * Songs coming up in Daily are left out, unless that would leave the decade empty.
  */
 export function pickFreePlaySong(decade, playedIds) {
-  const fresh = songsInDecade(decade).filter((song) => !playedIds.has(song.id));
+  const reserved = upcomingDailyIds();
+  const songs = songsInDecade(decade);
+  const unreserved = songs.filter((song) => !reserved.has(song.id));
+  const fresh = (unreserved.length > 0 ? unreserved : songs).filter((song) => !playedIds.has(song.id));
   return fresh.length > 0 ? fresh[Math.floor(Math.random() * fresh.length)] : null;
 }
 
