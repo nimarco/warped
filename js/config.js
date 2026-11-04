@@ -57,6 +57,9 @@ export const MAX_PEEKS = PEEK_COSTS.length;
 
 export const TRACKS_PER_DAY = 4;
 
+// Free Play leaves out the songs Daily will play in this many days, so it can't spoil them.
+export const FREE_PLAY_SKIPS_DAILY_DAYS = 60;
+
 // Puzzle #1 is this date (local time). Month is 0-based.
 export const LAUNCH_DATE = new Date(2026, 10, 2);
 
