@@ -77,9 +77,38 @@ export function getDailyLineup(puzzleNumber) {
   return lineup;
 }
 
-/** Every song from a decade (e.g. 1980), or all songs for "all". */
-export function songsInDecade(decade) {
-  return SONGS.filter((song) => decade === "all" || Math.floor(song.year / 10) * 10 === Number(decade));
+/* ---------- Free Play ---------- */
+
+// Daily's songs plus data/more-songs.js, loaded the first time Free Play opens.
+let freePlayPool = null;
+
+/**
+ * Load the extra Free Play songs. If that file can't load (offline, say),
+ * Free Play still works with Daily's songs.
+ * @returns {Promise<boolean>} false if only Daily's songs are available
+ */
+export async function loadFreePlayPool() {
+  if (freePlayPool) {
+    return freePlayPool.length > SONGS.length;
+  }
+  try {
+    const { MORE_SONGS } = await import("../data/more-songs.js");
+    freePlayPool = [...SONGS, ...MORE_SONGS];
+    return true;
+  } catch {
+    freePlayPool = SONGS;
+    return false;
+  }
+}
+
+/** Songs that fit Free Play's filters: a genre key from FREE_PLAY_GENRES and a decade (e.g. 1980) or "all". */
+export function freePlaySongs(genre, decade) {
+  const songs = genre === "hits" ? SONGS : freePlayPool ?? SONGS;
+  return songs.filter(
+    (song) =>
+      (genre === "hits" || genre === "all" || song.genres.includes(genre)) &&
+      (decade === "all" || Math.floor(song.year / 10) * 10 === Number(decade))
+  );
 }
 
 let upcoming = { puzzle: null, ids: new Set() };
@@ -100,27 +129,37 @@ function upcomingDailyIds() {
 }
 
 /**
- * A random Free Play song from a decade that isn't in `playedIds`, like
- * drawing from a shuffled deck. Null once every song there has been played.
- * Songs coming up in Daily are left out, unless that would leave the decade empty.
+ * A random Free Play song that fits the filters and isn't in `playedIds`,
+ * like drawing from a shuffled deck. Null once every song there has been played.
+ * Songs coming up in Daily are left out, unless that would leave nothing.
  */
-export function pickFreePlaySong(decade, playedIds) {
+export function pickFreePlaySong(genre, decade, playedIds) {
   const reserved = upcomingDailyIds();
-  const songs = songsInDecade(decade);
+  const songs = freePlaySongs(genre, decade);
   const unreserved = songs.filter((song) => !reserved.has(song.id));
   const fresh = (unreserved.length > 0 ? unreserved : songs).filter((song) => !playedIds.has(song.id));
   return fresh.length > 0 ? fresh[Math.floor(Math.random() * fresh.length)] : null;
 }
 
-/** Decades that have at least a few songs, for the Free Play filter. */
-export function availableDecades() {
+// A filter option needs at least this many songs to be offered.
+const MIN_SONGS_PER_OPTION = 5;
+
+/** How many songs each genre has, for the genre filter. Genres with too few are left out. */
+export function genreCounts(genres) {
+  return genres
+    .map((genre) => [genre, freePlaySongs(genre, "all").length])
+    .filter(([, count]) => count >= MIN_SONGS_PER_OPTION);
+}
+
+/** Decades with at least a few songs in a genre, for the era filter. */
+export function availableDecades(genre) {
   const counts = new Map();
-  for (const song of SONGS) {
+  for (const song of freePlaySongs(genre, "all")) {
     const decade = Math.floor(song.year / 10) * 10;
     counts.set(decade, (counts.get(decade) ?? 0) + 1);
   }
   return [...counts.entries()]
-    .filter(([, count]) => count >= 5)
+    .filter(([, count]) => count >= MIN_SONGS_PER_OPTION)
     .map(([decade]) => decade)
     .sort((a, b) => a - b);
 }

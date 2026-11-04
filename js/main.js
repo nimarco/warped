@@ -4,16 +4,27 @@
  * the game rules, storage and the page. Handles both Daily and Free Play.
  */
 
-import { BUSY_RETRIES, BUSY_RETRY_MS, LAYER_LABELS, LAYER_ORDER, MAX_TRIES, TIER_NAMES, TRACKS_PER_DAY } from "./config.js";
+import {
+  BUSY_RETRIES,
+  BUSY_RETRY_MS,
+  FREE_PLAY_GENRES,
+  LAYER_LABELS,
+  LAYER_ORDER,
+  MAX_TRIES,
+  TIER_NAMES,
+  TRACKS_PER_DAY,
+} from "./config.js";
 import { SONGS } from "../data/songs.js";
 import { Autocomplete } from "./autocomplete.js";
 import {
   availableDecades,
+  freePlaySongs,
+  genreCounts,
   getDailyLineup,
   getPuzzleNumber,
+  loadFreePlayPool,
   msUntilNextPuzzle,
   pickFreePlaySong,
-  songsInDecade,
 } from "./daily.js";
 import { intensityForTier, TrackRound } from "./game.js";
 import { findMusicVideo, lookupSongs, searchSongs } from "./itunes.js";
@@ -55,7 +66,7 @@ const app = {
   progressFrame: null,
   countdownTimer: null,
   day: loadDay(puzzleNumber) ?? { puzzle: puzzleNumber, current: 0, tracks: [], finished: false },
-  free: { decade: "all", score: 0, count: 0, played: loadFreePlayed() },
+  free: { genre: "hits", decade: "all", score: 0, count: 0, played: loadFreePlayed(), poolReady: null },
 };
 
 /* ---------- Loading a track ---------- */
@@ -185,20 +196,30 @@ function loadDailyTrack() {
 }
 
 function loadFreeTrack() {
-  const { decade, played } = app.free;
-  let first = pickFreePlaySong(decade, played);
+  const { genre, decade, played } = app.free;
+  let first = pickFreePlaySong(genre, decade, played);
   if (!first) {
-    // Every song in this era has been heard: shuffle the era's deck again.
-    for (const song of songsInDecade(decade)) {
+    // Every song that fits the filters has been heard: shuffle that deck again.
+    for (const song of freePlaySongs(genre, decade)) {
       played.delete(song.id);
     }
-    ui.toast(decade === "all" ? "You've heard every song. Starting over." : `You've heard every ${decade}s song. Starting over.`);
+    ui.toast("You've heard every song in this mix. Starting over.");
     // Don't open the new round with the song that just ended.
-    first = pickFreePlaySong(decade, new Set([...played, app.round?.song.id])) ?? pickFreePlaySong(decade, played);
+    first = pickFreePlaySong(genre, decade, new Set([...played, app.round?.song.id])) ?? pickFreePlaySong(genre, decade, played);
   }
   const notFirst = new Set([...played, first.id]);
-  const backups = [pickFreePlaySong(decade, notFirst), pickFreePlaySong("all", notFirst)].filter(Boolean);
+  const backups = [pickFreePlaySong(genre, decade, notFirst), pickFreePlaySong("hits", "all", notFirst)].filter(Boolean);
   startTrack([first, ...backups], first.tier);
+}
+
+/** Fill the genre and era filters. An era with no songs in the chosen genre goes back to "All eras". */
+function renderFreeFilters() {
+  const decades = availableDecades(app.free.genre);
+  if (app.free.decade !== "all" && !decades.includes(Number(app.free.decade))) {
+    app.free.decade = "all";
+  }
+  ui.renderGenres(genreCounts(Object.keys(FREE_PLAY_GENRES)), app.free.genre);
+  ui.renderDecades(decades, app.free.decade);
 }
 
 /* ---------- Rendering the current round ---------- */
@@ -582,7 +603,20 @@ async function enterFreePlay() {
   clearInterval(app.countdownTimer);
   ui.showScreen("play");
   await unlockAudio().catch(() => {});
-  loadFreeTrack();
+  if (!app.free.poolReady) {
+    ui.setTvStatus({ text: "Loading tape…", loading: true });
+    app.free.poolReady = loadFreePlayPool().then((complete) => {
+      if (!complete) {
+        ui.toast("Couldn't load the extra songs. Playing the top 40 hits for now.");
+      }
+      renderFreeFilters();
+    });
+  }
+  await app.free.poolReady;
+  // The player may have gone back to Daily while the songs loaded.
+  if (app.mode === "free") {
+    loadFreeTrack();
+  }
 }
 
 async function startDaily() {
@@ -637,6 +671,12 @@ for (const button of elements.modeButtons) {
   });
 }
 
+elements.genreSelect.addEventListener("change", () => {
+  app.free.genre = elements.genreSelect.value;
+  renderFreeFilters();
+  loadFreeTrack();
+});
+
 elements.decadeSelect.addEventListener("change", () => {
   app.free.decade = elements.decadeSelect.value;
   loadFreeTrack();
@@ -667,7 +707,7 @@ elements.helpDialog.addEventListener("close", markHelpSeen);
 
 /* ---------- Start ---------- */
 
-ui.renderDecades(availableDecades(), app.free.decade);
+renderFreeFilters();
 ui.showSilentTip(/iPhone|iPad|iPod/.test(navigator.userAgent));
 enterDaily();
 

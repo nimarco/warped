@@ -60,6 +60,24 @@ export const TRACKS_PER_DAY = 4;
 // Free Play leaves out the songs Daily will play in this many days, so it can't spoil them.
 export const FREE_PLAY_SKIPS_DAILY_DAYS = 60;
 
+// Free Play's song filter. "hits" is Daily's song list (Billboard top 40),
+// "all" adds every extra song, and the rest are genres.
+export const FREE_PLAY_GENRES = {
+  hits: "Top 40 hits",
+  all: "Everything",
+  pop: "Pop",
+  rock: "Rock",
+  country: "Country",
+  rnb: "R&B and soul",
+  hiphop: "Hip-hop",
+  alternative: "Alternative",
+  latin: "Latin",
+  kpop: "K-pop",
+  anime: "Anime",
+  dance: "Dance",
+  soundtrack: "Soundtracks",
+};
+
 // Puzzle #1 is this date (local time). Month is 0-based.
 export const LAUNCH_DATE = new Date(2026, 10, 2);
 
