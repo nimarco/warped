@@ -4,7 +4,7 @@
  * they're given; the game decisions happen in game.js and main.js.
  */
 
-import { LAYER_LABELS, LAYER_ORDER, MAX_TRIES, TIER_NAMES } from "./config.js";
+import { FREE_PLAY_GENRES, LAYER_LABELS, LAYER_ORDER, MAX_TRIES, TIER_NAMES } from "./config.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -33,6 +33,7 @@ export const elements = {
 
   trackProgress: $("track-progress"),
   freeBar: $("free-bar"),
+  genreSelect: $("genre-select"),
   decadeSelect: $("decade-select"),
 
   visualizer: $("visualizer"),
@@ -114,9 +115,9 @@ export function renderTrackProgress(tracks, currentIndex) {
   elements.trackProgress.replaceChildren(...steps);
 }
 
-export function renderDecades(decades, selected) {
-  const options = [["all", "All eras"], ...decades.map((decade) => [String(decade), `${decade}s`])];
-  elements.decadeSelect.replaceChildren(
+/** Replace a <select>'s options with [value, label] pairs. */
+function fillSelect(select, options, selected) {
+  select.replaceChildren(
     ...options.map(([value, label]) => {
       const option = document.createElement("option");
       option.value = value;
@@ -125,6 +126,17 @@ export function renderDecades(decades, selected) {
       return option;
     })
   );
+}
+
+/** @param {[string, number][]} counts  genre key and how many songs it has */
+export function renderGenres(counts, selected) {
+  const options = counts.map(([genre, count]) => [genre, `${FREE_PLAY_GENRES[genre]} (${count.toLocaleString()})`]);
+  fillSelect(elements.genreSelect, options, selected);
+}
+
+export function renderDecades(decades, selected) {
+  const options = [["all", "All eras"], ...decades.map((decade) => [String(decade), `${decade}s`])];
+  fillSelect(elements.decadeSelect, options, selected);
 }
 
 export function renderFreeScore(score, count) {

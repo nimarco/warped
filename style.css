@@ -588,6 +588,12 @@ svg {
   margin: 0 0 14px;
 }
 
+.free-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .free-label {
   color: var(--text-dim);
   font-size: 14px;
