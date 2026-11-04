@@ -77,12 +77,18 @@ export function getDailyLineup(puzzleNumber) {
   return lineup;
 }
 
-/** A random song for Free Play, optionally limited to a decade (e.g. 1980). */
-export function pickFreePlaySong(decade, excludeIds) {
-  const pool = SONGS.filter((song) => decade === "all" || Math.floor(song.year / 10) * 10 === Number(decade));
-  const fresh = pool.filter((song) => !excludeIds.has(song.id));
-  const choices = fresh.length > 0 ? fresh : pool;
-  return choices[Math.floor(Math.random() * choices.length)];
+/** Every song from a decade (e.g. 1980), or all songs for "all". */
+export function songsInDecade(decade) {
+  return SONGS.filter((song) => decade === "all" || Math.floor(song.year / 10) * 10 === Number(decade));
+}
+
+/**
+ * A random Free Play song from a decade that isn't in `playedIds`, like
+ * drawing from a shuffled deck. Null once every song there has been played.
+ */
+export function pickFreePlaySong(decade, playedIds) {
+  const fresh = songsInDecade(decade).filter((song) => !playedIds.has(song.id));
+  return fresh.length > 0 ? fresh[Math.floor(Math.random() * fresh.length)] : null;
 }
 
 /** Decades that have at least a few songs, for the Free Play filter. */

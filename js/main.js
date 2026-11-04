@@ -7,7 +7,14 @@
 import { BUSY_RETRIES, BUSY_RETRY_MS, LAYER_LABELS, LAYER_ORDER, MAX_TRIES, TIER_NAMES, TRACKS_PER_DAY } from "./config.js";
 import { SONGS } from "../data/songs.js";
 import { Autocomplete } from "./autocomplete.js";
-import { availableDecades, getDailyLineup, getPuzzleNumber, msUntilNextPuzzle, pickFreePlaySong } from "./daily.js";
+import {
+  availableDecades,
+  getDailyLineup,
+  getPuzzleNumber,
+  msUntilNextPuzzle,
+  pickFreePlaySong,
+  songsInDecade,
+} from "./daily.js";
 import { intensityForTier, TrackRound } from "./game.js";
 import { findMusicVideo, lookupSongs, searchSongs } from "./itunes.js";
 import { drawPixelated } from "./peek.js";
@@ -16,10 +23,12 @@ import {
   displayedStreak,
   hasSeenHelp,
   loadDay,
+  loadFreePlayed,
   loadStats,
   markHelpSeen,
   recordDailyResult,
   saveDay,
+  saveFreePlayed,
   storageAvailable,
 } from "./storage.js";
 import * as ui from "./ui.js";
@@ -46,7 +55,7 @@ const app = {
   progressFrame: null,
   countdownTimer: null,
   day: loadDay(puzzleNumber) ?? { puzzle: puzzleNumber, current: 0, tracks: [], finished: false },
-  free: { decade: "all", score: 0, count: 0, played: new Set() },
+  free: { decade: "all", score: 0, count: 0, played: loadFreePlayed() },
 };
 
 /* ---------- Loading a track ---------- */
@@ -120,6 +129,11 @@ async function startTrack(candidates, tier, saved, attempt = 1) {
     app.clipStart = player.findLoudestStart();
     ui.setTvStatus(null);
     saveProgress();
+    if (app.mode === "free") {
+      // A song counts as heard once it plays, even if the player moves on.
+      app.free.played.add(song.id);
+      saveFreePlayed(app.free.played);
+    }
     renderRound();
 
     if (app.round.isOver) {
@@ -171,8 +185,19 @@ function loadDailyTrack() {
 }
 
 function loadFreeTrack() {
-  const first = pickFreePlaySong(app.free.decade, app.free.played);
-  const backups = [pickFreePlaySong(app.free.decade, app.free.played), pickFreePlaySong("all", app.free.played)];
+  const { decade, played } = app.free;
+  let first = pickFreePlaySong(decade, played);
+  if (!first) {
+    // Every song in this era has been heard: shuffle the era's deck again.
+    for (const song of songsInDecade(decade)) {
+      played.delete(song.id);
+    }
+    ui.toast(decade === "all" ? "You've heard every song. Starting over." : `You've heard every ${decade}s song. Starting over.`);
+    // Don't open the new round with the song that just ended.
+    first = pickFreePlaySong(decade, new Set([...played, app.round?.song.id])) ?? pickFreePlaySong(decade, played);
+  }
+  const notFirst = new Set([...played, first.id]);
+  const backups = [pickFreePlaySong(decade, notFirst), pickFreePlaySong("all", notFirst)].filter(Boolean);
   startTrack([first, ...backups], first.tier);
 }
 
@@ -427,7 +452,6 @@ function showReveal(playSong) {
   } else if (playSong) {
     app.free.score += round.points;
     app.free.count += 1;
-    app.free.played.add(round.song.id);
     ui.renderFreeScore(app.free.score, app.free.count);
   }
 

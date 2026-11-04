@@ -13,6 +13,7 @@ const KEYS = {
   stats: "warped:stats",
   day: "warped:day",
   seenHelp: "warped:seen-help",
+  freePlayed: "warped:free-played",
 };
 
 const DEFAULT_STATS = {
@@ -110,6 +111,15 @@ export function loadDay(puzzleNumber) {
 
 export function saveDay(day) {
   write(KEYS.day, day);
+}
+
+/** IDs of the songs already served in Free Play, so a reload doesn't bring them back. */
+export function loadFreePlayed() {
+  return new Set(read(KEYS.freePlayed, []));
+}
+
+export function saveFreePlayed(ids) {
+  write(KEYS.freePlayed, [...ids]);
 }
 
 export function hasSeenHelp() {
