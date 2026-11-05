@@ -724,6 +724,12 @@ svg {
   font-weight: 600;
 }
 
+/* The remote's buttons only appear on wide screens (see "Wide screens") */
+.remote-power,
+.remote-pad {
+  display: none;
+}
+
 .free-score {
   margin-left: auto;
   color: var(--text-dim);
@@ -2258,70 +2264,98 @@ dd {
     box-shadow: 0 0 0 1px var(--text), 0 0 24px -6px var(--damage-glow);
   }
 
-  /* The Free Play filters as a TV remote: IR window and power LED on top,
-     the menus as little LCD readouts, a pad of buttons at the bottom. */
+  /* The Free Play filters as a TV remote: a slim plastic body with an IR
+     window, a power button and a status LED on top, the menus as little LCD
+     readouts, then a D-pad and the maker's name. */
   .free-bar {
     position: relative;
     flex-direction: column;
     align-items: stretch;
-    gap: 14px;
-    margin: 0;
-    padding: 36px 18px 84px;
-    border: 1px solid var(--line-strong);
-    border-radius: 30px 30px 44px 44px;
-    background: linear-gradient(165deg, #2c2632, #1a171e 55%, #141117);
+    gap: 15px;
+    width: 224px;
+    margin: 0 auto;
+    padding: 46px 20px 16px;
+    border: 1px solid #3a3342;
+    border-radius: 48px 48px 56px 56px / 36px 36px 64px 64px;
+    background:
+      linear-gradient(90deg, rgba(255, 255, 255, 0.06), transparent 14%, transparent 86%, rgba(0, 0, 0, 0.35)),
+      linear-gradient(180deg, #302937, #1d1922 40%, #17141b);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      inset 0 -14px 24px rgba(0, 0, 0, 0.35),
-      0 26px 40px -18px rgba(0, 0, 0, 0.9);
+      inset 0 2px 0 rgba(255, 255, 255, 0.09),
+      inset 0 -18px 30px rgba(0, 0, 0, 0.4),
+      0 30px 44px -20px rgba(0, 0, 0, 0.95),
+      0 0 0 4px rgba(0, 0, 0, 0.25);
   }
 
-  /* IR window and the power LED (it blinks while a clip plays) */
+  /* IR window, with the status LED that blinks while a clip plays */
   .free-bar::before {
     content: "";
     position: absolute;
-    top: 14px;
-    left: 50%;
-    width: 64px;
-    height: 9px;
-    transform: translateX(-50%);
-    border-radius: 5px;
+    top: 18px;
+    left: 30px;
+    width: 70px;
+    height: 12px;
+    border-radius: 6px;
     background:
-      radial-gradient(circle at calc(100% - 4px) 50%, var(--accent) 0 3px, transparent 4px),
-      linear-gradient(90deg, #2a0a14, #4d1326) no-repeat 0 0 / 70% 100%;
+      radial-gradient(circle at calc(100% - 5px) 50%, var(--accent) 0 3px, transparent 4px),
+      linear-gradient(180deg, #4d1326, #22070f) no-repeat 0 0 / 74% 100%;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.7);
   }
 
   body.is-playing .free-bar::before {
     animation: led-blink 1.2s step-end infinite;
   }
 
-  /* A pad of six buttons */
-  .free-bar::after {
-    content: "";
+  /* The red power button */
+  .remote-power {
+    display: block;
     position: absolute;
-    right: 26px;
-    bottom: 20px;
-    left: 26px;
-    height: 46px;
-    background: radial-gradient(circle, #342e3b 0 8px, rgba(0, 0, 0, 0.5) 9px, transparent 10px) 0 0 / 33.333% 50% repeat;
+    top: 12px;
+    right: 28px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ff7a7a, #d12f3a 55%, #8e1b24);
+    box-shadow: 0 3px 0 #5a1017, 0 5px 8px rgba(0, 0, 0, 0.5);
   }
 
+  .remote-power::after {
+    /* The power symbol */
+    content: "";
+    position: absolute;
+    inset: 7px;
+    border: 2px solid rgba(255, 255, 255, 0.85);
+    border-top-color: transparent;
+    border-radius: 50%;
+  }
+
+  /* Each label is printed on the readout's bezel, across its top edge */
   .free-filter {
+    position: relative;
     flex-direction: column;
     align-items: stretch;
-    gap: 5px;
   }
 
   .free-label {
+    position: absolute;
+    top: -7px;
+    left: 10px;
+    z-index: 1;
+    padding: 0 5px;
+    border-radius: 3px;
+    background: #211d26;
     color: var(--text-faint);
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
+    line-height: 14px;
     letter-spacing: 0.16em;
     text-transform: uppercase;
   }
 
   .free-filter .select {
     width: 100%;
+    min-height: 36px;
+    padding-top: 8px;
     border-color: #2b3431;
     border-radius: 10px;
     background-color: #0a0d0c;
@@ -2352,6 +2386,63 @@ dd {
   .free-score strong {
     color: var(--correct);
     font-weight: 400;
+  }
+
+  /* Rubber buttons below the readouts (decoration) */
+  .remote-pad {
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    margin-top: 2px;
+  }
+
+  .remote-dpad {
+    display: grid;
+    grid-template-columns: repeat(3, 20px);
+    grid-template-rows: repeat(3, 20px);
+    place-items: center;
+    width: 72px;
+    height: 72px;
+    padding: 6px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #2a2430 0 30%, #231f28 31% 100%);
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.06), 0 3px 0 #0d0b0f, 0 6px 10px rgba(0, 0, 0, 0.5);
+    color: var(--text-faint);
+    font-size: 10px;
+  }
+
+  .dpad-up { grid-area: 1 / 2; }
+  .dpad-left { grid-area: 2 / 1; }
+  .dpad-right { grid-area: 2 / 3; }
+  .dpad-down { grid-area: 3 / 2; }
+
+  .dpad-ok {
+    grid-area: 2 / 2;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #3d3646, #25212b);
+    box-shadow: 0 2px 0 #0d0b0f;
+    color: var(--text-dim);
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  /* The maker's name, printed on the plastic */
+  .remote-brand {
+    margin-top: 2px;
+    color: var(--text-faint);
+    font-size: 12px;
+    font-weight: 800;
+    font-stretch: 125%;
+    letter-spacing: 0.08em;
+  }
+
+  .remote-brand span {
+    font-weight: 500;
+    font-stretch: 100%;
   }
 
   .guesses {

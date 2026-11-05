@@ -78,6 +78,8 @@
         <ol class="track-progress" id="track-progress" aria-label="Today's tracks"></ol>
 
         <div class="free-bar" id="free-bar" hidden>
+          <!-- Remote hardware (wide screens only, decoration): power button and IR window -->
+          <span class="remote-power" aria-hidden="true"></span>
           <div class="free-filter">
             <label class="free-label" for="genre-select">Songs</label>
             <select class="select" id="genre-select"></select>
@@ -95,6 +97,13 @@
             <select class="select" id="difficulty-select"></select>
           </div>
           <p class="free-score">Session <strong id="free-score">0</strong> pts · <span id="free-count">0 songs</span></p>
+          <!-- More remote hardware (decoration): a D-pad and the maker's name -->
+          <div class="remote-pad" aria-hidden="true">
+            <div class="remote-dpad">
+              <span class="dpad-up">▲</span><span class="dpad-left">◀</span><span class="dpad-ok">OK</span><span class="dpad-right">▶</span><span class="dpad-down">▼</span>
+            </div>
+            <p class="remote-brand">Warped <span>VCR 2004</span></p>
+          </div>
         </div>
       </div>
 
