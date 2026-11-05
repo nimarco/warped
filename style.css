@@ -2109,7 +2109,8 @@ dd {
 
   .play {
     display: grid;
-    grid-template-columns: 236px minmax(0, var(--content-width)) 290px;
+    /* Equal side columns, so the TV sits in the middle of the page. */
+    grid-template-columns: 270px minmax(0, var(--content-width)) 270px;
     grid-template-rows: auto auto 1fr;
     grid-template-areas:
       "shelf deck side"
