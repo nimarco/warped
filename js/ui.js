@@ -72,6 +72,19 @@ export function setMode(mode) {
   }
   elements.trackProgress.hidden = mode !== "daily";
   elements.freeBar.hidden = mode !== "free";
+  $("shelf-label").textContent = mode === "daily" ? "Today's tape" : "Free Play mix";
+}
+
+/**
+ * The room behind the TV: its glow takes the damage's color (null for the
+ * default pink), and brightens while a clip plays (see setPlaying).
+ */
+export function setAmbience(distortion) {
+  if (distortion) {
+    document.body.dataset.damage = distortion;
+  } else {
+    delete document.body.dataset.damage;
+  }
 }
 
 export function renderIntro({ puzzleNumber, dateText, startLabel }) {
@@ -83,17 +96,24 @@ export function renderIntro({ puzzleNumber, dateText, startLabel }) {
 /* ---------- Daily track progress ---------- */
 
 /**
+ * Today's four tapes. On wide screens they stand on the shelf like cassette
+ * spines, each in its damage's color.
  * @param {({ status: string, points: number } | undefined)[]} tracks
  * @param {number} currentIndex
+ * @param {string[]} distortions  each track's damage
  */
-export function renderTrackProgress(tracks, currentIndex) {
+export function renderTrackProgress(tracks, currentIndex, distortions) {
   const steps = [1, 2, 3, 4].map((tier, index) => {
     const track = tracks[index];
     const step = document.createElement("li");
     step.className = "track-step";
+    step.dataset.damage = distortions[index];
 
     const name = document.createElement("span");
     name.textContent = TIER_NAMES[tier];
+    const damage = document.createElement("span");
+    damage.className = "track-damage";
+    damage.textContent = DISTORTIONS[distortions[index]].osd;
     const value = document.createElement("strong");
 
     if (track?.status === "solved") {
@@ -111,7 +131,7 @@ export function renderTrackProgress(tracks, currentIndex) {
       step.setAttribute("aria-current", "step");
     }
 
-    step.append(value, name);
+    step.append(value, name, damage);
     return step;
   });
   elements.trackProgress.replaceChildren(...steps);
@@ -281,6 +301,7 @@ export function showPicture(kind, art) {
 
 export function setPlaying(isPlaying) {
   elements.tv.classList.toggle("is-playing", isPlaying);
+  document.body.classList.toggle("is-playing", isPlaying);
   elements.playButton.classList.toggle("is-playing", isPlaying);
   elements.playButton.classList.remove("is-inviting");
   elements.playButton.setAttribute("aria-label", isPlaying ? "Stop the clip" : "Play the clip");
@@ -415,6 +436,7 @@ export function renderPeeks(peeks, canPeek) {
 export function showReveal({ solved, song, points, nextLabel }) {
   $("guess-area").hidden = true;
   $("reveal").hidden = false;
+  elements.playScreen.classList.add("is-revealed");
 
   const eyebrow = $("reveal-eyebrow");
   eyebrow.textContent = solved ? "You got it" : "The song was";
@@ -458,6 +480,7 @@ export function setGuessPlaceholder(anime) {
 export function hideReveal() {
   $("guess-area").hidden = false;
   $("reveal").hidden = true;
+  elements.playScreen.classList.remove("is-revealed");
 }
 
 /* ---------- Summary ---------- */

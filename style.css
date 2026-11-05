@@ -58,6 +58,7 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  background: var(--bg);
 }
 
 body {
@@ -66,15 +67,86 @@ body {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  background:
-    radial-gradient(1200px 600px at 50% -10%, rgba(255, 61, 127, 0.1), transparent 60%),
-    radial-gradient(900px 500px at 100% 100%, rgba(61, 245, 255, 0.06), transparent 60%),
-    var(--bg);
+  /* The background is the "room" layer below, so the TV's glow can show through. */
   color: var(--text);
   font-family: var(--font-body);
   font-size: 16px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- The room ----------
+   A dark room lit by the TV: magenta and cyan light at the edges (the logo's
+   color split), the TV's glow in the current damage's color (brighter while
+   a clip plays), faint scanlines, and a slow VHS tracking band rolling down. */
+
+body { --damage-color: var(--accent); --damage-glow: rgba(255, 61, 127, 0.3); }
+[data-damage="fastforward"] { --damage-color: var(--cyan); --damage-glow: rgba(61, 245, 255, 0.26); }
+[data-damage="rewind"] { --damage-color: var(--accent); --damage-glow: rgba(255, 61, 127, 0.3); }
+[data-damage="rickroll"] { --damage-color: var(--partial); --damage-glow: rgba(255, 210, 63, 0.24); }
+[data-damage="chewed"] { --damage-color: #ff9f43; --damage-glow: rgba(255, 159, 67, 0.26); }
+[data-damage="warp"] { --damage-color: #f78cff; --damage-glow: rgba(247, 140, 255, 0.26); }
+[data-damage="muffled"] { --damage-color: #b99cff; --damage-glow: rgba(185, 156, 255, 0.3); }
+
+.room {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 700px at -8% 8%, rgba(255, 61, 127, 0.13), transparent 65%),
+    radial-gradient(900px 700px at 108% 92%, rgba(61, 245, 255, 0.1), transparent 65%),
+    radial-gradient(1400px 500px at 50% 120%, rgba(0, 0, 0, 0.6), transparent 70%);
+}
+
+/* Scanlines */
+.room::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 4px);
+}
+
+/* The TV's light on the wall behind it */
+.room-glow {
+  position: absolute;
+  top: 38vh;
+  left: 50%;
+  width: min(1500px, 140vw);
+  height: 900px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(closest-side, var(--damage-glow), transparent);
+  opacity: 0.6;
+  transition: opacity 0.8s var(--ease-out);
+}
+
+body.is-playing .room-glow {
+  opacity: 1;
+  animation: glow-flicker 2.6s ease-in-out infinite;
+}
+
+@keyframes glow-flicker {
+  0%, 100% { opacity: 1; }
+  42% { opacity: 0.82; }
+  46% { opacity: 0.95; }
+  70% { opacity: 0.88; }
+}
+
+/* A VHS tracking band that rolls down the room now and then */
+.room-tracking {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 140px;
+  background: linear-gradient(180deg, transparent, rgba(244, 236, 216, 0.035) 45%, rgba(244, 236, 216, 0.06) 50%, rgba(244, 236, 216, 0.035) 55%, transparent);
+  animation: tracking-roll-room 18s linear infinite;
+}
+
+@keyframes tracking-roll-room {
+  0% { transform: translateY(-160px); }
+  55%, 100% { transform: translateY(110vh); }
 }
 
 /* Film grain over the whole page */
@@ -574,6 +646,10 @@ svg {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+.track-damage {
+  display: none;
 }
 
 .track-step strong {
@@ -1463,6 +1539,27 @@ svg {
 
 /* ---------- Reveal ---------- */
 
+/* Labels for the side panels on wide screens ("Today's tape", "Your tries") */
+.panel-label {
+  display: none;
+  margin-bottom: 10px;
+  color: var(--text-faint);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.guess-side {
+  margin-top: 6px;
+}
+
+/* After a track ends, the reveal takes the guessing space; peeks are over. */
+.play.is-revealed .peeks,
+.play.is-revealed .guess-side {
+  display: none;
+}
+
 .reveal {
   margin-top: 22px;
   /* Room below the buttons when ui.js scrolls the card into view
@@ -1919,9 +2016,152 @@ dd {
   }
 }
 
+/* ---------- Wide screens: shelf | deck | your tries ----------
+   The shelf (today's tapes, or the Free Play filters) and your tries sit
+   beside the TV instead of above and below it, so a round fits on one screen. */
+
+@media (min-width: 1200px) {
+  .topbar {
+    max-width: 1240px;
+  }
+
+  .game {
+    max-width: 1240px;
+  }
+
+  .intro,
+  .summary {
+    max-width: var(--content-width);
+    margin-inline: auto;
+  }
+
+  .play {
+    display: grid;
+    grid-template-columns: 220px minmax(0, var(--content-width)) 300px;
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+      "shelf deck side"
+      "shelf guess side"
+      "shelf reveal side";
+    column-gap: 28px;
+    justify-content: center;
+    align-items: start;
+  }
+
+  .shelf {
+    grid-area: shelf;
+    position: sticky;
+    top: 16px;
+  }
+
+  .deck { grid-area: deck; }
+  .guess-area { grid-area: guess; }
+  .reveal { grid-area: reveal; }
+
+  .guess-side {
+    grid-area: side;
+    margin-top: 0;
+  }
+
+  .panel-label {
+    display: block;
+  }
+
+  /* Your tries stay beside the reveal, so you can see how the track went. */
+  .play.is-revealed .guess-side {
+    display: block;
+  }
+
+  /* Today's tapes as cassette spines, each in its damage's color */
+  .track-progress {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin: 0;
+  }
+
+  .track-step {
+    display: grid;
+    grid-template-columns: 52px 1fr;
+    grid-template-areas: "value name" "value damage";
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 2px;
+    min-height: 64px;
+    padding: 10px 14px 10px 12px;
+    border-left: 4px solid var(--damage-color);
+    background:
+      linear-gradient(90deg, rgba(255, 255, 255, 0.03), transparent 60%),
+      var(--bg-raised);
+    font-size: 13px;
+  }
+
+  .track-step strong {
+    grid-area: value;
+    font-size: 28px;
+    text-align: center;
+  }
+
+  .track-step > span:not(.track-damage) {
+    grid-area: name;
+  }
+
+  .track-damage {
+    grid-area: damage;
+    display: block;
+    color: var(--damage-color);
+    font-family: var(--font-mono);
+    font-size: 17px;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    line-height: 1;
+  }
+
+  .track-step.is-current {
+    border-color: var(--text);
+    border-left-color: var(--damage-color);
+    box-shadow: 0 0 0 1px var(--text), 0 0 24px -6px var(--damage-glow);
+  }
+
+  /* The Free Play filters, stacked */
+  .free-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    margin: 0;
+  }
+
+  .free-filter {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .free-filter .select {
+    width: 100%;
+  }
+
+  .free-score {
+    margin: 4px 0 0;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+
+  .guesses {
+    margin-top: 0;
+  }
+
+  .guess-side .peeks-buttons {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ---------- Reduced motion ---------- */
 
 @media (prefers-reduced-motion: reduce) {
+  .room-tracking {
+    display: none;
+  }
+
   *,
   *::before,
   *::after {

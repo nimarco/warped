@@ -176,6 +176,7 @@ async function startTrack(candidates, tier, distortion, saved, attempt = 1) {
       return;
     }
     app.round = new TrackRound(song, tier, damage, saved);
+    ui.setAmbience(damage);
     // Start looking for Rick's GIF now; the intro waits a moment for it.
     const gif = damage === "rickroll" ? loadRickGif() : null;
     app.clipStart = player.findLoudestStart();
@@ -264,7 +265,7 @@ function loadDailyTrack() {
   const saved = app.day.tracks[index];
   // A saved track keeps the exact song it started with (even if it was a backup).
   const candidates = saved ? SONGS.filter((song) => song.id === saved.id).slice(0, 1) : lineup[index];
-  ui.renderTrackProgress(app.day.tracks, index);
+  ui.renderTrackProgress(app.day.tracks, index, dailyDistortions);
   startTrack(candidates.length ? candidates : lineup[index], index + 1, dailyDistortions[index], saved);
 }
 
@@ -560,7 +561,7 @@ function showReveal(playSong) {
   });
 
   if (app.mode === "daily") {
-    ui.renderTrackProgress(app.day.tracks, app.day.current);
+    ui.renderTrackProgress(app.day.tracks, app.day.current, dailyDistortions);
   } else if (playSong) {
     app.free.score += round.points;
     app.free.count += 1;
@@ -634,6 +635,7 @@ function dayTotal() {
 
 function showSummary() {
   stopClip();
+  ui.setAmbience(null);
   const stats = loadStats();
   ui.renderSummary({
     puzzleNumber,
@@ -677,6 +679,7 @@ async function share() {
 /* ---------- Screens and modes ---------- */
 
 function showDailyIntro() {
+  ui.setAmbience(null);
   const started = app.day.tracks.length > 0;
   ui.renderIntro({
     puzzleNumber,

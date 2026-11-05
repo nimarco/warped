@@ -19,6 +19,8 @@
   <script type="module" src="js/main.js"></script>
 </head>
 <body>
+  <!-- The room around the TV: its glow takes the current damage's color (styles under "The room") -->
+  <div class="room" aria-hidden="true"><div class="room-glow"></div><div class="room-tracking"></div></div>
   <a class="skip-link" href="#game">Skip to the game</a>
 
   <header class="topbar">
@@ -68,22 +70,26 @@
     <!-- Play: the deck, used by both Daily and Free Play -->
     <section class="screen play" id="play-screen" aria-label="Current track" hidden>
 
-      <ol class="track-progress" id="track-progress" aria-label="Today's tracks"></ol>
+      <!-- The shelf: today's four tapes (Daily) or the Free Play filters. A side column on wide screens. -->
+      <div class="shelf">
+        <p class="panel-label" id="shelf-label">Today's tape</p>
+        <ol class="track-progress" id="track-progress" aria-label="Today's tracks"></ol>
 
-      <div class="free-bar" id="free-bar" hidden>
-        <div class="free-filter">
-          <label class="free-label" for="genre-select">Songs</label>
-          <select class="select" id="genre-select"></select>
+        <div class="free-bar" id="free-bar" hidden>
+          <div class="free-filter">
+            <label class="free-label" for="genre-select">Songs</label>
+            <select class="select" id="genre-select"></select>
+          </div>
+          <div class="free-filter">
+            <label class="free-label" for="distortion-select">Damage</label>
+            <select class="select" id="distortion-select"></select>
+          </div>
+          <div class="free-filter">
+            <label class="free-label" for="decade-select">Era</label>
+            <select class="select" id="decade-select"></select>
+          </div>
+          <p class="free-score">Session <strong id="free-score">0</strong> pts · <span id="free-count">0 songs</span></p>
         </div>
-        <div class="free-filter">
-          <label class="free-label" for="distortion-select">Damage</label>
-          <select class="select" id="distortion-select"></select>
-        </div>
-        <div class="free-filter">
-          <label class="free-label" for="decade-select">Era</label>
-          <select class="select" id="decade-select"></select>
-        </div>
-        <p class="free-score">Session <strong id="free-score">0</strong> pts · <span id="free-count">0 songs</span></p>
       </div>
 
       <div class="deck">
@@ -143,7 +149,11 @@
         </form>
 
         <p class="message" id="message" role="status" aria-live="polite"></p>
+      </div>
 
+      <!-- Your tries and the peeks. A side column on wide screens. -->
+      <div class="guess-side">
+        <p class="panel-label">Your tries</p>
         <ol class="guesses" id="guesses" aria-label="Your guesses"></ol>
 
         <div class="peeks">
