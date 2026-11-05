@@ -87,9 +87,20 @@ export function setAmbience(distortion) {
   }
 }
 
-export function renderIntro({ puzzleNumber, dateText, startLabel }) {
-  $("intro-number").textContent = `#${puzzleNumber}`;
-  $("intro-date").textContent = dateText;
+/** "NOV 05 2026", the way a camcorder stamps the date. */
+function dateStamp(date) {
+  const month = date.toLocaleDateString("en-US", { month: "short" }).toUpperCase();
+  return `${month} ${String(date.getDate()).padStart(2, "0")} ${date.getFullYear()}`;
+}
+
+/** Tape numbers read like a VCR counter: 04, 12, 103. */
+function tapeNumber(puzzleNumber) {
+  return String(puzzleNumber).padStart(2, "0");
+}
+
+export function renderIntro({ puzzleNumber, date, startLabel }) {
+  $("intro-number").textContent = tapeNumber(puzzleNumber);
+  $("intro-date").textContent = dateStamp(date);
   $("start-label").textContent = startLabel;
 }
 
@@ -397,6 +408,7 @@ const GUESS_STYLES = {
 
 /** Five rows: past guesses, then empty slots. */
 export function renderGuesses(guesses, animateLast = false) {
+  $("tries-label").textContent = `Tries ${guesses.length}/${MAX_TRIES}`;
   const rows = [];
   for (let index = 0; index < MAX_TRIES; index++) {
     const guess = guesses[index];
@@ -455,7 +467,7 @@ export function showReveal({ solved, song, points, nextLabel }) {
   elements.playScreen.classList.add("is-revealed");
 
   const eyebrow = $("reveal-eyebrow");
-  eyebrow.textContent = solved ? "You got it" : "The song was";
+  eyebrow.textContent = solved ? "▶ Got it" : "■ The song was";
   eyebrow.classList.toggle("is-missed", !solved);
 
   $("reveal-title").textContent = song.title;
@@ -518,7 +530,7 @@ function verdictFor(total) {
  * @param {{ song: object, status: string, points: number, guesses: object[], peeks: number }[]} options.tracks
  */
 export function renderSummary({ puzzleNumber, total, streak, tracks }) {
-  $("summary-number").textContent = `#${puzzleNumber}`;
+  $("summary-number").textContent = tapeNumber(puzzleNumber);
   $("summary-verdict").textContent = verdictFor(total);
   $("summary-streak").textContent = streak;
   $("share-fallback").hidden = true;

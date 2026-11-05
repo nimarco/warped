@@ -14,7 +14,7 @@
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=VT323&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Permanent+Marker&family=VT323&display=swap">
   <link rel="stylesheet" href="style.css">
   <script type="module" src="js/main.js"></script>
 </head>
@@ -47,7 +47,8 @@
 
     <!-- Intro: shown before today's tape starts -->
     <section class="screen intro" id="intro-screen" aria-labelledby="intro-title">
-      <p class="eyebrow">Daily tape <span class="mono" id="intro-number">#1</span> · <span id="intro-date"></span></p>
+      <!-- A camcorder-style date stamp, the way a home video burns the date into the picture -->
+      <p class="datestamp"><span aria-hidden="true">▶</span> Tape <span id="intro-number">01</span> <span class="datestamp-date" id="intro-date"></span></p>
       <h1 class="intro-title" id="intro-title">Name the song<br>before it <span class="glitch" data-text="un-warps">un-warps</span>.</h1>
       <p class="intro-lede">Four songs, each with its own kind of tape damage. Every wrong guess eases the damage a step, and the sooner you name it, the more you score.</p>
 
@@ -72,7 +73,8 @@
 
       <!-- The shelf: today's four tapes (Daily) or the Free Play filters. A side column on wide screens. -->
       <div class="shelf">
-        <p class="panel-label" id="shelf-label">Today's tape</p>
+        <!-- Written on masking tape, like the label on a home-made mixtape -->
+        <p class="tape-label" id="shelf-label">Today's tape</p>
         <ol class="track-progress" id="track-progress" aria-label="Today's tracks"></ol>
 
         <div class="free-bar" id="free-bar" hidden>
@@ -155,7 +157,7 @@
 
       <!-- Your tries and the peeks. A side column on wide screens. -->
       <div class="guess-side">
-        <p class="panel-label">Your tries</p>
+        <p class="osd-label" id="tries-label">Tries 0/5</p>
         <ol class="guesses" id="guesses" aria-label="Your guesses"></ol>
 
         <div class="peeks">
@@ -175,7 +177,7 @@
 
       <!-- Reveal: replaces the guess area when a track ends -->
       <div class="reveal" id="reveal" hidden>
-        <p class="eyebrow reveal-eyebrow" id="reveal-eyebrow">You got it</p>
+        <p class="osd-flash" id="reveal-eyebrow">▶ Got it</p>
         <h2 class="reveal-title" id="reveal-title">Song title</h2>
         <p class="reveal-meta" id="reveal-meta"></p>
         <p class="reveal-show" id="reveal-show" hidden></p>
@@ -192,7 +194,7 @@
 
     <!-- Summary: end of the daily tape -->
     <section class="screen summary" id="summary-screen" aria-labelledby="summary-title" hidden>
-      <p class="eyebrow">Daily tape <span class="mono" id="summary-number">#1</span> · complete</p>
+      <p class="datestamp"><span aria-hidden="true">■</span> End of tape <span id="summary-number">01</span></p>
       <h2 class="summary-title" id="summary-title"><span id="summary-score">0</span><span class="summary-max">/1000</span></h2>
       <p class="summary-verdict" id="summary-verdict"></p>
 

@@ -684,7 +684,7 @@ function showDailyIntro() {
   const started = app.day.tracks.length > 0;
   ui.renderIntro({
     puzzleNumber,
-    dateText: new Date().toLocaleDateString(undefined, { month: "long", day: "numeric" }),
+    date: new Date(),
     startLabel: started ? `Resume track ${app.day.current + 1} of ${TRACKS_PER_DAY}` : "Press play",
   });
   ui.showScreen("intro");
