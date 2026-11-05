@@ -161,3 +161,16 @@ export const REQUEST_TIMEOUT_MS = 8000;
 // asks for about 12 seconds), and give up after this many retries.
 export const BUSY_RETRY_MS = 12000;
 export const BUSY_RETRIES = 3;
+
+// The intro card that names a track's damage before it plays, in milliseconds.
+// Rickrolled runs longer so Rick gets to dance before the title drops.
+export const CUTSCENE_MS = 2200;
+export const CUTSCENE_GIF_MS = 2800;
+
+// GIPHY finds the dancing Rick for the Rickrolled intro. Get a free key at
+// developers.giphy.com (Create an App → API). Without a key, or if GIPHY fails,
+// the intro just shows the title.
+export const GIPHY_API_KEY = "";
+export const GIPHY_QUERY = "rick astley dancing";
+// Wait this long for the GIF before starting the intro without it.
+export const GIPHY_WAIT_MS = 2500;

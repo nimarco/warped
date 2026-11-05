@@ -7,9 +7,12 @@
 import {
   BUSY_RETRIES,
   BUSY_RETRY_MS,
+  CUTSCENE_GIF_MS,
+  CUTSCENE_MS,
   DISTORTIONS,
   FALLBACK_DISTORTION,
   FREE_PLAY_GENRES,
+  GIPHY_WAIT_MS,
   MAX_TRIES,
   RICKROLL_TRACK_ID,
   TIER_NAMES,
@@ -31,6 +34,7 @@ import {
   randomDistortion,
 } from "./daily.js";
 import { TrackRound } from "./game.js";
+import { findRickGif } from "./giphy.js";
 import { findMusicVideo, lookupSongs, searchSongs } from "./itunes.js";
 import { drawPixelated } from "./peek.js";
 import { buildShareText, copyText } from "./share.js";
@@ -71,7 +75,7 @@ const app = {
   progressFrame: null,
   countdownTimer: null,
   day: loadDay(puzzleNumber) ?? { puzzle: puzzleNumber, current: 0, tracks: [], finished: false },
-  free: { genre: "hits", decade: "all", distortion: "mixed", score: 0, count: 0, played: loadFreePlayed(), poolReady: null },
+  free: { genre: "hits", decade: "all", distortion: "mixed", lastIntro: null, score: 0, count: 0, played: loadFreePlayed(), poolReady: null },
 };
 
 /* ---------- Loading a track ---------- */
@@ -153,8 +157,8 @@ async function startTrack(candidates, tier, distortion, saved, attempt = 1) {
   ui.setMessage("");
   ui.setOsdTrack(trackLabel(tier));
   ui.setTvStatus({ text: "Loading tape…", loading: true });
+  ui.stopCutscene();
   ui.renderDamage(saved?.distortion ?? distortion, 0);
-  ui.setTape(null, null);
   ui.renderGuesses(saved?.guesses ?? []);
   ui.renderPeeks(0, false);
 
@@ -169,6 +173,8 @@ async function startTrack(candidates, tier, distortion, saved, attempt = 1) {
       return;
     }
     app.round = new TrackRound(song, tier, damage, saved);
+    // Start looking for Rick's GIF now; the intro waits a moment for it.
+    const gif = damage === "rickroll" ? findRickGif() : null;
     app.clipStart = player.findLoudestStart();
     ui.setTvStatus(null);
     saveProgress();
@@ -182,11 +188,15 @@ async function startTrack(candidates, tier, distortion, saved, attempt = 1) {
     if (app.round.isOver) {
       showReveal(false);
     } else {
-      ui.setPlayEnabled(true, true);
-      ui.setGuessEnabled(true);
       if (app.round.peeks > 0) {
         restorePeek();
       }
+      await showIntro(app.round, gif);
+      if (loadId !== app.loadId) {
+        return;
+      }
+      ui.setPlayEnabled(true, true);
+      ui.setGuessEnabled(true);
       // Every track is loaded by a click (Press play, Next, Free Play), so the
       // clip can start right away instead of asking for a second click.
       if (audioUnlocked()) {
@@ -209,6 +219,26 @@ async function startTrack(candidates, tier, distortion, saved, attempt = 1) {
     }
     ui.setTvStatus({ text: error.message, retry: true });
   }
+}
+
+/**
+ * The intro card naming the track's damage. Daily shows it before every new
+ * track; Free Play only when the damage differs from the last one it showed.
+ * A track that already has guesses (reopened later) skips it.
+ */
+async function showIntro(round, gifSearch) {
+  if (round.guesses.length > 0 || (app.mode === "free" && app.free.lastIntro === round.distortion)) {
+    return;
+  }
+  if (app.mode === "free") {
+    app.free.lastIntro = round.distortion;
+  }
+  const timeout = new Promise((resolve) => setTimeout(resolve, GIPHY_WAIT_MS, null));
+  const gif = gifSearch ? await Promise.race([gifSearch, timeout]) : null;
+  if (app.round !== round) {
+    return;
+  }
+  await ui.playCutscene(round.distortion, { gif, duration: gif ? CUTSCENE_GIF_MS : CUTSCENE_MS });
 }
 
 function trackLabel(tier) {
@@ -261,7 +291,6 @@ function renderFreeFilters() {
 function renderRound(eased = false, animateLast = false) {
   const round = app.round;
   ui.renderDamage(round.distortion, round.level, eased);
-  ui.setTape(round.distortion, round.level, eased);
   ui.renderGuesses(round.guesses, animateLast);
   ui.renderPeeks(round.peeks, round.canPeek);
   ui.setWorth(round.isOver ? round.points : round.potentialPoints);
@@ -350,7 +379,7 @@ async function submitGuess(event) {
     return;
   }
   if (round.hasGuessed(song)) {
-    ui.setMessage(`You already tried "${song.title}". Pick a different one.`, "info");
+    ui.setMessage(`You already tried "${song.title}" by ${song.artist}. Pick a different one.`, "info");
     return;
   }
 
@@ -400,12 +429,12 @@ function afterTry(result) {
   ui.setMessage(`${feedback.text} ${unwarp}`, feedback.tone);
   renderRound(true, true);
 
-  // Play the slightly clearer version once the tape's repair animation has shown.
+  // Play the slightly clearer version after a short beat.
   setTimeout(() => {
     if (app.round === round && !round.isOver) {
       playClip();
     }
-  }, 1000);
+  }, 650);
 }
 
 /* ---------- Peeks ---------- */
@@ -493,7 +522,6 @@ function showReveal(playSong) {
   ui.showPicture("art", coverFor(round.song));
   ui.setMessage("");
   ui.renderDamage(round.distortion, null);
-  ui.setTape(null, null);
   visualizer.setDistortion(0);
 
   const isLastDaily = app.mode === "daily" && app.day.current === TRACKS_PER_DAY - 1;
@@ -625,6 +653,7 @@ function enterDaily() {
   app.mode = "daily";
   ui.setMode("daily");
   stopClip();
+  ui.stopCutscene();
   app.loadId++;
   if (app.day.finished) {
     showSummary();

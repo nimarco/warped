@@ -38,7 +38,6 @@ export const elements = {
   decadeSelect: $("decade-select"),
 
   tv: $("tv"),
-  tape: $("tape"),
   visualizer: $("visualizer"),
   peekCanvas: $("peek-canvas"),
   peekVideo: $("peek-video"),
@@ -191,29 +190,75 @@ export function setTvStatus(status) {
   elements.retryButton.hidden = !status.retry;
 }
 
-// How hard the Warp ripple pulls the cassette at each damage step (SVG displacement).
-const WARP_RIPPLE = [20, 12, 7, 3];
+/* ---------- The damage intro ---------- */
+
+let cutscene = null;
 
 /**
- * The cassette on the TV: shows the track's damage and how bad it still is.
- * Hidden once the song is clean. eased: play the "repair" jolt.
+ * Play the short intro that names a track's damage. gif: { url, alt } shows
+ * the GIPHY dancer (Rickrolled). Resolves when it ends, or early when the
+ * player clicks it or stopCutscene() is called.
  */
-export function setTape(distortion, level, eased = false) {
-  const tape = elements.tape;
-  tape.hidden = !distortion || level === null;
-  if (tape.hidden) {
-    return;
+export function playCutscene(distortion, { gif = null, duration = 2200 } = {}) {
+  stopCutscene();
+  const panel = $("cutscene");
+  const { name, osd, about } = DISTORTIONS[distortion];
+  panel.dataset.damage = distortion;
+  panel.classList.remove("is-leaving");
+  panel.classList.toggle("has-gif", Boolean(gif));
+  // The tape deck symbol (▶▶, ◀◀, ●…) from the OSD label.
+  $("cutscene-osd").textContent = `${osd.split(" ")[0]} TAPE DAMAGE`;
+  $("cutscene-about").textContent = about[0].toUpperCase() + about.slice(1);
+
+  // One span per letter, so Warp can knock each to its own pitch.
+  const title = $("cutscene-title");
+  const letters = [...name].map((character, index) => {
+    const letter = document.createElement("span");
+    letter.className = "letter";
+    letter.setAttribute("aria-hidden", "true");
+    letter.style.setProperty("--i", index);
+    letter.textContent = character;
+    return letter;
+  });
+  const spoken = document.createElement("span");
+  spoken.className = "visually-hidden";
+  spoken.textContent = `${name}: ${about}`;
+  title.replaceChildren(spoken, ...letters);
+
+  const figure = $("cutscene-gif");
+  figure.hidden = !gif;
+  figure.querySelector("img")?.remove();
+  if (gif) {
+    const image = document.createElement("img");
+    image.src = gif.url;
+    image.alt = gif.alt;
+    figure.prepend(image);
   }
-  tape.dataset.damage = distortion;
-  tape.dataset.level = level;
-  $("tape-label").textContent = DISTORTIONS[distortion].name;
-  $("warp-displace").setAttribute("scale", WARP_RIPPLE[level]);
-  if (eased) {
-    tape.classList.remove("is-easing");
-    // Reading layout restarts the jolt animation when it's already running.
-    void tape.offsetWidth;
-    tape.classList.add("is-easing");
+
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    duration = Math.min(duration, 1400);
   }
+  panel.hidden = false;
+
+  return new Promise((resolve) => {
+    const leaveTimer = setTimeout(() => panel.classList.add("is-leaving"), duration - 300);
+    const endTimer = setTimeout(finish, duration);
+    function finish() {
+      clearTimeout(leaveTimer);
+      clearTimeout(endTimer);
+      panel.removeEventListener("click", finish);
+      panel.hidden = true;
+      cutscene = null;
+      resolve();
+    }
+    panel.addEventListener("click", finish);
+    cutscene = finish;
+  });
+}
+
+/** End the intro now, if one is playing. */
+export function stopCutscene() {
+  cutscene?.();
 }
 
 /** What the TV shows: "visualizer", "peek" (pixelated cover), "video" or "art". */

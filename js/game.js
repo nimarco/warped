@@ -5,7 +5,7 @@
  */
 
 import { DISTORTIONS, MAX_PEEKS, MAX_TRIES, PEEK_COSTS, POINTS_BY_TRY } from "./config.js";
-import { checkGuess, normalizeTitle } from "./matching.js";
+import { checkGuess } from "./matching.js";
 
 /** Points for solving on a given try after a number of peeks. */
 export function pointsFor(tryNumber, peeks) {
@@ -80,9 +80,9 @@ export class TrackRound {
     return !this.isOver && this.peeks < MAX_PEEKS;
   }
 
+  /** True if this song (same title and artist, any version) was already guessed. */
   hasGuessed(song) {
-    const title = normalizeTitle(song.title);
-    return this.guesses.some((guess) => guess.result !== "skip" && normalizeTitle(guess.title) === title);
+    return this.guesses.some((guess) => guess.result !== "skip" && checkGuess(song, guess) === "correct");
   }
 
   /** Make a guess. Returns "correct", "artist", "title" or "wrong". */

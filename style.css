@@ -687,262 +687,342 @@ svg {
   100% { opacity: 1; filter: none; transform: none; }
 }
 
-/* ---------- The cassette: what kind of damage the tape has ----------
-   ui.js sets data-damage (fastforward, rewind, rickroll, chewed, warp, muffled)
-   and data-level (0 = worst, 3 = mildest) on .tape, and adds .is-easing for a
-   moment when the damage eases. Everything else happens here. */
+/* ---------- The damage intro ----------
+   A ~2 s title card on the TV before each track (ui.js playCutscene).
+   data-damage picks the scene, .has-gif makes room for the GIPHY dancer
+   (Rickrolled), and .is-leaving switches the card off like an old TV. */
 
-.tape {
-  --reel-speed: 2.4s;
-  --reel-direction: normal;
+.cutscene {
+  --cut-color: var(--accent);
   position: absolute;
-  inset: 15% 10% 12%;
+  inset: 0;
   display: grid;
   place-items: center;
-  transition: opacity 0.4s;
+  overflow: hidden;
+  background: radial-gradient(ellipse at center, #1d1922 0%, #0a080c 75%);
+  cursor: pointer;
+  animation: cut-on 0.25s steps(3);
 }
 
-.tape-svg {
-  width: 100%;
-  height: 100%;
-  overflow: visible;
+.cutscene[data-damage="fastforward"] { --cut-color: var(--cyan); }
+.cutscene[data-damage="rewind"] { --cut-color: var(--accent); }
+.cutscene[data-damage="rickroll"] { --cut-color: var(--partial); }
+.cutscene[data-damage="chewed"] { --cut-color: #ff9f43; }
+.cutscene[data-damage="warp"] { --cut-color: #f78cff; }
+.cutscene[data-damage="muffled"] { --cut-color: #b99cff; }
+
+.cutscene.is-leaving {
+  animation: cut-off 0.3s ease-in forwards;
 }
 
-/* The page gives icons a currentColor outline; the cassette sets its own. */
-.tape-svg {
-  fill: none;
-  stroke: none;
+@keyframes cut-on {
+  from { opacity: 0; filter: brightness(3); }
 }
 
-/* While the clip plays, the sound bars take over and the tape fades back. */
-.tv.is-playing .tape {
-  opacity: 0.22;
+@keyframes cut-off {
+  60% { opacity: 1; transform: scaleY(0.02); filter: brightness(4); }
+  100% { opacity: 0; transform: scale(0, 0.02); }
 }
 
-.tv:not(.is-playing) .tv-visualizer {
-  opacity: 0;
+.cutscene-scene {
+  position: absolute;
+  inset: 0;
 }
 
-.tv-visualizer {
-  transition: opacity 0.4s;
+.cutscene-scene::before,
+.cutscene-scene::after {
+  content: "";
+  position: absolute;
 }
 
-.tape.is-easing .tape-svg {
-  animation: tape-jolt 0.5s steps(3);
+.cutscene-card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  text-align: center;
 }
 
-@keyframes tape-jolt {
-  25% { transform: translate(-6px, 2px); filter: hue-rotate(60deg); }
-  50% { transform: translate(5px, -2px); }
-  75% { transform: translate(-2px, 0); }
-}
-
-.cassette-body { fill: #2a2430; stroke: #463d50; stroke-width: 2; }
-.cassette-label { fill: var(--text); }
-.cassette-stripe { fill: var(--accent); }
-.cassette-name {
-  fill: var(--accent-ink);
+.cutscene-osd {
+  color: var(--cut-color);
   font-family: var(--font-mono);
-  font-size: 26px;
-  letter-spacing: 0.06em;
+  font-size: clamp(18px, 4.4vw, 28px);
+  line-height: 1;
+  letter-spacing: 0.12em;
+  animation: fade-up 0.3s var(--ease-out) 0.15s both;
+}
+
+.cutscene-title {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: clamp(46px, 12vw, 96px);
+  line-height: 0.9;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-}
-.cassette-window { fill: #0e0c10; }
-.cassette-tape { stroke: #5b3a24; stroke-width: 6; }
-.cassette-head { fill: #221d27; stroke: #463d50; stroke-width: 2; }
-.cassette-hole { fill: #0e0c10; }
-
-.reel {
-  animation: spin var(--reel-speed) linear infinite var(--reel-direction);
-  transform-box: fill-box;
-  transform-origin: center;
+  text-shadow: -3px 0 var(--accent), 3px 0 var(--cyan), 0 0 24px rgba(244, 236, 216, 0.35);
+  animation: title-pop 0.45s var(--ease-out) 0.3s both;
 }
 
-.reel circle { fill: var(--text); }
-.reel path { stroke: #2a2430; stroke-width: 4; stroke-linecap: round; }
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
+.cutscene-about {
+  max-width: 30ch;
+  color: var(--text);
+  font-size: clamp(14px, 3.4vw, 17px);
+  line-height: 1.35;
+  opacity: 0.8;
+  animation: fade-up 0.4s var(--ease-out) 0.7s both;
 }
 
-/* Damage-specific parts stay hidden unless their damage is on. */
-.ff-lines,
-.bites,
-.spaghetti,
-.dog,
-.rick,
-.wall {
+@keyframes title-pop {
+  0% { opacity: 0; transform: scale(0.4); }
+  60% { opacity: 1; transform: scale(1.12); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+/* ▶▶ Fast-forward: cyan streaks race past, the title shoots in from the left. */
+.cutscene[data-damage="fastforward"] .cutscene-scene,
+.cutscene[data-damage="rewind"] .cutscene-scene {
+  --streak: linear-gradient(90deg, var(--cut-color) 0 90px, transparent 90px);
+  background:
+    var(--streak) 0 18% / 280px 2px repeat-x,
+    var(--streak) 120px 34% / 340px 3px repeat-x,
+    var(--streak) 60px 66% / 300px 2px repeat-x,
+    var(--streak) 200px 82% / 260px 3px repeat-x;
+  opacity: 0.7;
+  animation: streak-right 0.22s linear infinite;
+}
+
+.cutscene[data-damage="fastforward"] .cutscene-title {
+  animation: dash-in-left 0.45s var(--ease-out) 0.25s both;
+}
+
+@keyframes streak-right {
+  from { background-position-x: 0, 120px, 60px, 200px; }
+  to { background-position-x: 1120px, 1480px, 1260px, 1240px; }
+}
+
+@keyframes dash-in-left {
+  0% { opacity: 0; transform: translateX(-70vw) skewX(-30deg); }
+  70% { opacity: 1; transform: translateX(12px) skewX(8deg); }
+  100% { opacity: 1; transform: none; }
+}
+
+/* ◀◀ Rewind: the streaks run backwards, a tracking band rolls up the screen. */
+.cutscene[data-damage="rewind"] .cutscene-scene {
+  animation: streak-left 0.22s linear infinite;
+}
+
+.cutscene[data-damage="rewind"] .cutscene-scene::before {
+  left: 0;
+  right: 0;
+  height: 14%;
+  background: repeating-linear-gradient(90deg, rgba(244, 236, 216, 0.6) 0 3px, transparent 3px 9px, rgba(244, 236, 216, 0.3) 9px 11px, transparent 11px 17px);
+  animation: tracking-roll 0.8s linear infinite;
+}
+
+.cutscene[data-damage="rewind"] .cutscene-title {
+  animation: dash-in-right 0.45s var(--ease-out) 0.25s both;
+}
+
+@keyframes streak-left {
+  from { background-position-x: 1120px, 1480px, 1260px, 1240px; }
+  to { background-position-x: 0, 120px, 60px, 200px; }
+}
+
+@keyframes tracking-roll {
+  from { top: 100%; }
+  to { top: -14%; }
+}
+
+@keyframes dash-in-right {
+  0% { opacity: 0; transform: translateX(70vw) skewX(30deg); }
+  70% { opacity: 1; transform: translateX(-12px) skewX(-8deg); }
+  100% { opacity: 1; transform: none; }
+}
+
+/* ● Rickrolled: Rick dances (GIPHY), then the title drops in below him. */
+.cutscene[data-damage="rickroll"] .cutscene-scene {
+  background: radial-gradient(circle at 50% 40%, rgba(255, 210, 63, 0.28), transparent 55%);
+  animation: spotlight 0.5s ease-in-out infinite alternate;
+}
+
+.cutscene[data-damage="rickroll"] .cutscene-osd {
+  color: var(--wrong);
+  animation: fade-up 0.3s var(--ease-out) 0.15s both, blink 1s steps(2) 0.45s infinite;
+}
+
+@keyframes spotlight {
+  to { opacity: 0.55; }
+}
+
+.cutscene-gif {
+  position: absolute;
+  inset: 13% 0 30%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  animation: cut-on 0.3s steps(3);
+}
+
+.cutscene-gif img {
+  height: calc(100% - 16px);
+  width: auto;
+  max-width: 86%;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px var(--partial), 0 0 30px rgba(255, 210, 63, 0.35);
+}
+
+.cutscene-gif figcaption {
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 14px;
+}
+
+.cutscene.has-gif .cutscene-card {
+  align-self: end;
+  gap: 2px;
+  padding-bottom: 7%;
+}
+
+.cutscene.has-gif .cutscene-title {
+  font-size: clamp(34px, 8vw, 64px);
+  animation-delay: 0.9s;
+}
+
+.cutscene.has-gif .cutscene-osd {
   display: none;
 }
 
-/* ▶▶ Fast-forward: reels flat out, speed streaks. Slower each step. */
-.tape[data-damage="fastforward"] { --reel-speed: 0.16s; }
-.tape[data-damage="fastforward"][data-level="1"] { --reel-speed: 0.26s; }
-.tape[data-damage="fastforward"][data-level="2"] { --reel-speed: 0.42s; }
-.tape[data-damage="fastforward"][data-level="3"] { --reel-speed: 0.7s; }
-.tape[data-damage="fastforward"] .ff-lines { display: inline; }
-
-.ff-lines line {
-  stroke: var(--cyan);
-  stroke-width: 3;
-  stroke-linecap: round;
-  animation: streak calc(var(--reel-speed) * 4) linear infinite;
+.cutscene.has-gif .cutscene-about {
+  display: none;
 }
 
-.ff-lines line:nth-child(2) { animation-delay: -0.3s; }
-.ff-lines line:nth-child(3) { animation-delay: -0.6s; }
-
-@keyframes streak {
-  from { transform: translateX(-40px); opacity: 0; }
-  20% { opacity: 1; }
-  to { transform: translateX(360px); opacity: 0; }
+/* ▒ Chewed: a pair of jaws chomps the screen twice, and the title comes out bitten. */
+.cutscene[data-damage="chewed"] .cutscene-scene::before,
+.cutscene[data-damage="chewed"] .cutscene-scene::after {
+  left: -2%;
+  right: -2%;
+  height: 52%;
+  background: linear-gradient(#b8456a 0 58%, var(--text) 58%);
+  clip-path: polygon(0 0, 100% 0, 100% 60%, 95% 100%, 90% 60%, 85% 100%, 80% 60%, 75% 100%, 70% 60%, 65% 100%, 60% 60%, 55% 100%, 50% 60%, 45% 100%, 40% 60%, 35% 100%, 30% 60%, 25% 100%, 20% 60%, 15% 100%, 10% 60%, 5% 100%, 0 60%);
+  animation: jaw-top 0.9s ease-in both;
 }
 
-/* ◀◀ Rewind: reels spin backwards, slower each step. */
-.tape[data-damage="rewind"] { --reel-direction: reverse; --reel-speed: 0.18s; }
-.tape[data-damage="rewind"][data-level="1"] { --reel-speed: 0.3s; }
-.tape[data-damage="rewind"][data-level="2"] { --reel-speed: 0.5s; }
-.tape[data-damage="rewind"][data-level="3"] { --reel-speed: 0.85s; }
-
-/* ● Rickrolled: a sticker slapped over the label, peeling off each step. */
-.tape[data-damage="rickroll"] .rick { display: inline; }
-
-.rick-sticker {
-  transform-box: fill-box;
-  transform-origin: 0 100%;
-  transform: rotate(-6deg);
-  transition: transform 0.7s var(--ease-out), opacity 0.7s;
+.cutscene[data-damage="chewed"] .cutscene-scene::before {
+  top: 0;
 }
 
-.rick-sticker rect { fill: var(--partial); stroke: #1d0610; stroke-width: 2; }
-.rick-sticker text {
-  fill: #1d0610;
-  font-family: var(--font-mono);
-  font-size: 26px;
-  text-anchor: middle;
-  letter-spacing: 0.04em;
+.cutscene[data-damage="chewed"] .cutscene-scene::after {
+  bottom: 0;
+  transform: scaleY(-1);
+  animation-name: jaw-bottom;
 }
 
-.tape[data-level="1"] .rick-sticker { transform: rotate(-14deg) translate(8px, -6px); opacity: 0.85; }
-.tape[data-level="2"] .rick-sticker { transform: rotate(-24deg) translate(18px, -14px); opacity: 0.6; }
-.tape[data-level="3"] .rick-sticker { transform: rotate(-36deg) translate(30px, -24px); opacity: 0.35; }
-
-.rec-dot { fill: var(--wrong); animation: blink 1s steps(2) infinite; }
-.rec-text { fill: var(--wrong); font-family: var(--font-mono); font-size: 18px; text-anchor: end; }
-
-/* ▒ Chewed: a dog chomping the corner, tape spilling out, bite marks.
-   Each step patches a bite and pulls some tape back in. */
-.tape[data-damage="chewed"] .bites,
-.tape[data-damage="chewed"] .spaghetti,
-.tape[data-damage="chewed"] .dog {
-  display: inline;
+.cutscene[data-damage="chewed"] .cutscene-title {
+  clip-path: polygon(0 0, 80% 0, 83% 16%, 87% 6%, 90% 26%, 94% 12%, 97% 34%, 100% 24%, 100% 100%, 0 100%);
+  animation: title-pop 0.45s var(--ease-out) 0.85s both;
 }
 
-.bites circle {
-  fill: #141117;
-  transition: opacity 0.5s, transform 0.5s var(--ease-out);
-  transform-box: fill-box;
-  transform-origin: center;
+.cutscene[data-damage="chewed"] .cutscene-osd {
+  animation-delay: 0.75s;
 }
 
-.tape[data-level="1"] .bites circle:nth-child(1),
-.tape[data-level="2"] .bites circle:nth-child(-n + 2),
-.tape[data-level="3"] .bites circle:nth-child(-n + 3) {
-  opacity: 0;
-  transform: scale(0.2);
+.cutscene[data-damage="chewed"] .cutscene-about {
+  animation-delay: 1.1s;
 }
 
-.spaghetti path {
-  fill: none;
-  stroke: #5b3a24;
-  stroke-width: 4;
-  stroke-linecap: round;
-  stroke-dasharray: 100 100;
-  transition: stroke-dasharray 0.7s var(--ease-out);
-  animation: wiggle 0.9s ease-in-out infinite alternate;
-  transform-box: fill-box;
-  transform-origin: 50% 0;
+@keyframes jaw-top {
+  0% { transform: translateY(-100%); }
+  22% { transform: translateY(-4%); }
+  36% { transform: translateY(-60%); }
+  52% { transform: translateY(-4%); }
+  100% { transform: translateY(-110%); }
 }
 
-.spaghetti path:nth-child(2) { animation-delay: -0.4s; }
-.tape[data-level="1"] .spaghetti path { stroke-dasharray: 70 100; }
-.tape[data-level="2"] .spaghetti path { stroke-dasharray: 42 100; }
-.tape[data-level="3"] .spaghetti path { stroke-dasharray: 18 100; }
-
-@keyframes wiggle {
-  from { transform: rotate(-3deg); }
-  to { transform: rotate(3deg); }
+@keyframes jaw-bottom {
+  0% { transform: scaleY(-1) translateY(-100%); }
+  22% { transform: scaleY(-1) translateY(-4%); }
+  36% { transform: scaleY(-1) translateY(-60%); }
+  52% { transform: scaleY(-1) translateY(-4%); }
+  100% { transform: scaleY(-1) translateY(-110%); }
 }
 
-.dog { animation: dog-bob 0.6s ease-in-out infinite alternate; }
-.dog-head, .dog-jaw { fill: #c98a4b; }
-.dog-ear { fill: #7a4a26; }
-.dog-snout { fill: #e0b07a; }
-.dog-nose, .dog-eye { fill: #1a1012; }
-
-.dog-jaw {
-  animation: chomp 0.32s ease-in-out infinite alternate;
-  transform-box: fill-box;
-  transform-origin: 100% 0;
+/* ∿ Warp: the screen ripples and every letter cracks to a different pitch. */
+.cutscene[data-damage="warp"] .cutscene-scene {
+  background: repeating-radial-gradient(circle at 50% 50%, rgba(247, 140, 255, 0.15) 0 10px, transparent 10px 26px, rgba(61, 245, 255, 0.12) 26px 30px, transparent 30px 44px);
+  animation: ripple 1.2s ease-in-out infinite alternate;
 }
 
-@keyframes chomp {
-  to { transform: rotate(16deg); }
+.cutscene-title .letter {
+  display: inline-block;
 }
 
-@keyframes dog-bob {
-  to { transform: translate(-3px, 2px) rotate(-2deg); }
+.cutscene[data-damage="warp"] .cutscene-title .letter {
+  animation: crack 0.36s ease-in-out calc(var(--i) * -0.07s) infinite alternate;
 }
 
-/* ∿ Warp: the whole tape ripples (scale set in ui.js) and wobbles. */
-.tape[data-damage="warp"] .cassette {
-  filter: url(#warp-filter);
-  animation: warp-wobble 1.3s ease-in-out infinite alternate;
-  transform-box: fill-box;
-  transform-origin: center;
+@keyframes ripple {
+  from { transform: scale(1); filter: hue-rotate(0deg); }
+  to { transform: scale(1.35) skewX(6deg); filter: hue-rotate(90deg); }
 }
 
-@keyframes warp-wobble {
-  from { transform: rotate(-3deg) skewX(4deg); }
-  to { transform: rotate(3deg) skewX(-4deg); }
+@keyframes crack {
+  0% { transform: translateY(-14%) scaleY(1.25) skewX(-10deg); }
+  100% { transform: translateY(14%) scaleY(0.8) skewX(10deg); }
 }
 
-.tape[data-damage="warp"][data-level="2"] .cassette,
-.tape[data-damage="warp"][data-level="3"] .cassette {
-  animation-duration: 2.4s;
+/* ◖ Muffled: a brick wall slams down, static crackles over it, the title is stamped on. */
+.cutscene[data-damage="muffled"] .cutscene-scene::before {
+  inset: 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='24'%3E%3Crect width='60' height='24' fill='%233a2a2c'/%3E%3Crect x='1' y='1' width='58' height='10' rx='1.5' fill='%239b4f3e'/%3E%3Crect x='-29' y='13' width='58' height='10' rx='1.5' fill='%238a4436'/%3E%3Crect x='31' y='13' width='58' height='10' rx='1.5' fill='%23a65a46'/%3E%3C/svg%3E") 0 0 / 90px 36px;
+  animation: wall-drop 0.5s cubic-bezier(0.55, 0, 1, 0.45) both;
 }
 
-/* ◖ Muffled: a brick wall in front, with TV static over it.
-   A row of bricks falls off and the static fades each step. */
-.wall-static {
-  fill: #fff;
+.cutscene[data-damage="muffled"] .cutscene-scene::after {
+  inset: 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.35;
   mix-blend-mode: screen;
-  opacity: 0.5;
-  transition: opacity 0.8s;
+  animation: static-hiss 0.3s steps(3) infinite;
 }
 
-.tape[data-level="1"] .wall-static { opacity: 0.32; }
-.tape[data-level="2"] .wall-static { opacity: 0.17; }
-.tape[data-level="3"] .wall-static { opacity: 0.06; }
-
-.tape[data-damage="muffled"] .wall { display: inline; }
-
-.wall-row {
-  stroke: #1c1418;
-  stroke-width: 2;
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-  transition: transform 0.8s cubic-bezier(0.55, 0, 1, 0.45), opacity 0.8s;
+.cutscene[data-damage="muffled"] .cutscene-card {
+  padding: 12px 22px;
+  border-radius: var(--radius);
+  background: rgba(10, 8, 12, 0.8);
+  animation: wall-thud 0.35s ease-out 0.5s both;
 }
 
-.tape[data-level="1"] .wall-row-0,
-.tape[data-level="2"] .wall-row-0,
-.tape[data-level="2"] .wall-row-1,
-.tape[data-level="3"] .wall-row-0,
-.tape[data-level="3"] .wall-row-1,
-.tape[data-level="3"] .wall-row-2 {
-  transform: translateY(240px) rotate(10deg);
-  opacity: 0;
+.cutscene[data-damage="muffled"] .cutscene-title {
+  animation: stamp 0.3s cubic-bezier(0.55, 0, 1, 0.45) 0.55s both;
+}
+
+@keyframes wall-drop {
+  from { transform: translateY(-105%); }
+}
+
+@keyframes wall-thud {
+  0% { opacity: 0; }
+  20% { opacity: 1; transform: translateY(6px); }
+  60% { transform: translateY(-3px); }
+}
+
+@keyframes static-hiss {
+  33% { background-position: 50px 70px; }
+  66% { background-position: -40px 20px; }
+  100% { background-position: 10px -60px; }
+}
+
+@keyframes stamp {
+  0% { opacity: 0; transform: scale(2.4) rotate(-6deg); }
+  100% { opacity: 1; transform: rotate(-2deg); }
 }
 
 /* Scanlines and a curved-glass shine on top of everything */
