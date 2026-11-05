@@ -52,7 +52,7 @@ import {
 } from "./storage.js";
 import * as ui from "./ui.js";
 import { Visualizer } from "./visualizer.js";
-import { audioUnlocked, playBlip, unlockAudio, WarpPlayer } from "./warp.js";
+import { playBlip, unlockAudio, WarpPlayer } from "./warp.js";
 
 const { elements } = ui;
 
@@ -197,11 +197,7 @@ async function startTrack(candidates, tier, distortion, saved, attempt = 1) {
       }
       ui.setPlayEnabled(true, true);
       ui.setGuessEnabled(true);
-      // Every track is loaded by a click (Press play, Next, Free Play), so the
-      // clip can start right away instead of asking for a second click.
-      if (audioUnlocked()) {
-        playClip();
-      }
+      // The clip waits for the player to press play.
     }
   } catch (error) {
     if (loadId !== app.loadId) {

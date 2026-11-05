@@ -51,11 +51,6 @@ export async function unlockAudio() {
   }
 }
 
-/** True once the browser allows sound, so a clip can start without another click. */
-export function audioUnlocked() {
-  return context?.state === "running";
-}
-
 /**
  * Chopped reverse: cut the clip into pieces of `pieceSeconds` and play each
  * piece backwards, keeping the pieces in order. Neighbouring pieces overlap
