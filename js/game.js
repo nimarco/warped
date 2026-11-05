@@ -1,10 +1,10 @@
 /*
  * game.js
- * The rules for one track: tries, layers, peeks and points.
+ * The rules for one track: tries, how damaged the tape is, peeks and points.
  * Pure logic with no page code, so it's easy to read and test.
  */
 
-import { LAYER_ORDER, LAYER_INTENSITY, MAX_PEEKS, MAX_TRIES, PEEK_COSTS, POINTS_BY_TRY, TIER_MULTIPLIER } from "./config.js";
+import { DISTORTIONS, MAX_PEEKS, MAX_TRIES, PEEK_COSTS, POINTS_BY_TRY } from "./config.js";
 import { checkGuess, normalizeTitle } from "./matching.js";
 
 /** Points for solving on a given try after a number of peeks. */
@@ -14,25 +14,17 @@ export function pointsFor(tryNumber, peeks) {
   return Math.round(base * (1 - peekCost));
 }
 
-/** Layer strengths for a tier: harder tracks get stronger distortion. */
-export function intensityForTier(tier) {
-  const multiplier = TIER_MULTIPLIER[tier] ?? 1;
-  const result = {};
-  for (const [layer, value] of Object.entries(LAYER_INTENSITY)) {
-    result[layer] = Math.min(value * multiplier, 1);
-  }
-  return result;
-}
-
 export class TrackRound {
   /**
    * @param {object} song   { id, title, artist, ... } from itunes.js
    * @param {number} tier   1–4
+   * @param {string} distortion  a key of DISTORTIONS
    * @param {object} [saved] progress restored from storage
    */
-  constructor(song, tier, saved = {}) {
+  constructor(song, tier, distortion, saved = {}) {
     this.song = song;
     this.tier = tier;
+    this.distortion = distortion;
     this.guesses = saved.guesses ?? [];
     this.peeks = saved.peeks ?? 0;
     this.status = saved.status ?? "playing";
@@ -46,9 +38,25 @@ export class TrackRound {
     return Math.min(this.guesses.length + 1, MAX_TRIES);
   }
 
-  /** Layers still on: one comes off per miss, so try 5 is the clean song. */
-  get activeLayers() {
-    return LAYER_ORDER.slice(Math.min(this.misses, LAYER_ORDER.length));
+  /** How damaged the tape is now: 0 = worst (try 1), one step less per miss. Null once it's clean. */
+  get level() {
+    const levels = DISTORTIONS[this.distortion].levels;
+    return this.misses < levels.length && !this.isOver ? this.misses : null;
+  }
+
+  /** Damage steps left before the clean song (4 on try 1, 0 when clean). */
+  get stepsLeft() {
+    return this.level === null ? 0 : DISTORTIONS[this.distortion].levels.length - this.level;
+  }
+
+  /** What warp.js should play right now, or null for the clean song. */
+  get damage() {
+    if (this.level === null) {
+      return null;
+    }
+    // The step's settings (value, plus static for Muffled), minus its screen label.
+    const { label, ...settings } = DISTORTIONS[this.distortion].levels[this.level];
+    return { type: this.distortion, ...settings };
   }
 
   get isOver() {
@@ -85,7 +93,7 @@ export class TrackRound {
     return result;
   }
 
-  /** Skip this try: costs a try, removes a layer. */
+  /** Skip this try: costs a try, and the damage eases one step. */
   skip() {
     this.guesses.push({ title: "", artist: "", result: "skip" });
     this.updateStatus("skip");
@@ -109,6 +117,6 @@ export class TrackRound {
 
   /** What gets saved to storage. */
   toJSON() {
-    return { id: this.song.id, guesses: this.guesses, peeks: this.peeks, status: this.status };
+    return { id: this.song.id, distortion: this.distortion, guesses: this.guesses, peeks: this.peeks, status: this.status };
   }
 }

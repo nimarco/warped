@@ -5,7 +5,14 @@
  * on every device.
  */
 
-import { FREE_PLAY_SKIPS_DAILY_DAYS, LAUNCH_DATE, TRACKS_PER_DAY } from "./config.js";
+import {
+  DISTORTION_ORDER,
+  FALLBACK_DISTORTION,
+  FREE_PLAY_SKIPS_DAILY_DAYS,
+  LAUNCH_DATE,
+  RICKROLL_TRACK_ID,
+  TRACKS_PER_DAY,
+} from "./config.js";
 import { SONGS } from "../data/songs.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -75,6 +82,25 @@ export function getDailyLineup(puzzleNumber) {
   }
 
   return lineup;
+}
+
+/**
+ * Which damage each of today's tracks gets: four different kinds, picked and
+ * ordered fresh each day (the same for everyone).
+ */
+export function getDailyDistortions(puzzleNumber) {
+  return shuffle(DISTORTION_ORDER, seededRandom(puzzleNumber * 9973 + 17)).slice(0, TRACKS_PER_DAY);
+}
+
+/** Rick can't be taped over his own song: that track gets the fallback damage. */
+export function distortionForSong(distortion, song) {
+  const isRick = song.id === RICKROLL_TRACK_ID || /rick astley/i.test(song.artist ?? "");
+  return distortion === "rickroll" && isRick ? FALLBACK_DISTORTION : distortion;
+}
+
+/** A random distortion for Free Play's "Mixed" setting. */
+export function randomDistortion() {
+  return DISTORTION_ORDER[Math.floor(Math.random() * DISTORTION_ORDER.length)];
 }
 
 /* ---------- Free Play ---------- */

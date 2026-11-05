@@ -7,10 +7,11 @@
 import {
   BUSY_RETRIES,
   BUSY_RETRY_MS,
+  DISTORTIONS,
+  FALLBACK_DISTORTION,
   FREE_PLAY_GENRES,
-  LAYER_LABELS,
-  LAYER_ORDER,
   MAX_TRIES,
+  RICKROLL_TRACK_ID,
   TIER_NAMES,
   TRACKS_PER_DAY,
 } from "./config.js";
@@ -18,15 +19,18 @@ import { SONGS } from "../data/songs.js";
 import { Autocomplete } from "./autocomplete.js";
 import {
   availableDecades,
+  distortionForSong,
   freePlaySongs,
   genreCounts,
+  getDailyDistortions,
   getDailyLineup,
   getPuzzleNumber,
   loadFreePlayPool,
   msUntilNextPuzzle,
   pickFreePlaySong,
+  randomDistortion,
 } from "./daily.js";
-import { intensityForTier, TrackRound } from "./game.js";
+import { TrackRound } from "./game.js";
 import { findMusicVideo, lookupSongs, searchSongs } from "./itunes.js";
 import { drawPixelated } from "./peek.js";
 import { buildShareText, copyText } from "./share.js";
@@ -50,6 +54,7 @@ const { elements } = ui;
 
 const puzzleNumber = getPuzzleNumber();
 const lineup = getDailyLineup(puzzleNumber);
+const dailyDistortions = getDailyDistortions(puzzleNumber);
 const player = new WarpPlayer();
 const visualizer = new Visualizer(elements.visualizer);
 const autocomplete = new Autocomplete({
@@ -66,7 +71,7 @@ const app = {
   progressFrame: null,
   countdownTimer: null,
   day: loadDay(puzzleNumber) ?? { puzzle: puzzleNumber, current: 0, tracks: [], finished: false },
-  free: { genre: "hits", decade: "all", score: 0, count: 0, played: loadFreePlayed(), poolReady: null },
+  free: { genre: "hits", decade: "all", distortion: "mixed", score: 0, count: 0, played: loadFreePlayed(), poolReady: null },
 };
 
 /* ---------- Loading a track ---------- */
@@ -84,7 +89,9 @@ async function lookupCandidates(candidates) {
   if (candidates.some((entry) => known.some((song) => song.id === entry.id))) {
     return known;
   }
-  app.day.songs = await lookupSongs([...lineup.flat(), ...candidates].map((entry) => entry.id));
+  // The Rick Roll rides along in the same request, for the "rickroll" track.
+  const ids = [...lineup.flat(), ...candidates].map((entry) => entry.id);
+  app.day.songs = await lookupSongs([...ids, RICKROLL_TRACK_ID]);
   saveDay(app.day);
   return app.day.songs;
 }
@@ -115,8 +122,27 @@ async function loadSong(candidates) {
   throw lastError;
 }
 
+/**
+ * The damage a track will actually use. Rick can't be taped over his own song,
+ * and if the Rick Roll can't be downloaded, the fallback damage stands in.
+ */
+async function prepareDistortion(distortion, song) {
+  const chosen = distortionForSong(distortion, song);
+  if (chosen !== "rickroll" || player.hasOverlay) {
+    return chosen;
+  }
+  try {
+    const known = app.day.songs?.find((item) => item.id === RICKROLL_TRACK_ID);
+    const rick = known ?? (await lookupSongs([RICKROLL_TRACK_ID]))[0];
+    await player.loadOverlay(rick.previewUrl);
+    return chosen;
+  } catch {
+    return FALLBACK_DISTORTION;
+  }
+}
+
 /** Get a track ready to play: restore its progress, reset the screen. */
-async function startTrack(candidates, tier, saved, attempt = 1) {
+async function startTrack(candidates, tier, distortion, saved, attempt = 1) {
   const loadId = ++app.loadId;
   stopClip();
   autocomplete.clear();
@@ -127,7 +153,8 @@ async function startTrack(candidates, tier, saved, attempt = 1) {
   ui.setMessage("");
   ui.setOsdTrack(trackLabel(tier));
   ui.setTvStatus({ text: "Loading tape…", loading: true });
-  ui.renderLayers(LAYER_ORDER);
+  ui.renderDamage(saved?.distortion ?? distortion, 0);
+  ui.setTape(null, null);
   ui.renderGuesses(saved?.guesses ?? []);
   ui.renderPeeks(0, false);
 
@@ -136,7 +163,12 @@ async function startTrack(candidates, tier, saved, attempt = 1) {
     if (loadId !== app.loadId) {
       return;
     }
-    app.round = new TrackRound(song, tier, saved);
+    // A saved track keeps the damage it started with.
+    const damage = await prepareDistortion(saved?.distortion ?? distortion, song);
+    if (loadId !== app.loadId) {
+      return;
+    }
+    app.round = new TrackRound(song, tier, damage, saved);
     app.clipStart = player.findLoudestStart();
     ui.setTvStatus(null);
     saveProgress();
@@ -170,7 +202,7 @@ async function startTrack(candidates, tier, saved, attempt = 1) {
       ui.setTvStatus({ text: "The music library is busy. Trying again in a few seconds…", loading: true });
       setTimeout(() => {
         if (loadId === app.loadId) {
-          startTrack(candidates, tier, saved, attempt + 1);
+          startTrack(candidates, tier, distortion, saved, attempt + 1);
         }
       }, BUSY_RETRY_MS);
       return;
@@ -192,7 +224,7 @@ function loadDailyTrack() {
   // A saved track keeps the exact song it started with (even if it was a backup).
   const candidates = saved ? SONGS.filter((song) => song.id === saved.id).slice(0, 1) : lineup[index];
   ui.renderTrackProgress(app.day.tracks, index);
-  startTrack(candidates.length ? candidates : lineup[index], index + 1, saved);
+  startTrack(candidates.length ? candidates : lineup[index], index + 1, dailyDistortions[index], saved);
 }
 
 function loadFreeTrack() {
@@ -209,7 +241,8 @@ function loadFreeTrack() {
   }
   const notFirst = new Set([...played, first.id]);
   const backups = [pickFreePlaySong(genre, decade, notFirst), pickFreePlaySong("hits", "all", notFirst)].filter(Boolean);
-  startTrack([first, ...backups], first.tier);
+  const distortion = app.free.distortion === "mixed" ? randomDistortion() : app.free.distortion;
+  startTrack([first, ...backups], first.tier, distortion);
 }
 
 /** Fill the genre and era filters. An era with no songs in the chosen genre goes back to "All eras". */
@@ -219,18 +252,20 @@ function renderFreeFilters() {
     app.free.decade = "all";
   }
   ui.renderGenres(genreCounts(Object.keys(FREE_PLAY_GENRES)), app.free.genre);
+  ui.renderDistortionChoices(app.free.distortion);
   ui.renderDecades(decades, app.free.decade);
 }
 
 /* ---------- Rendering the current round ---------- */
 
-function renderRound(justRemoved = null, animateLast = false) {
+function renderRound(eased = false, animateLast = false) {
   const round = app.round;
-  ui.renderLayers(round.activeLayers, justRemoved);
+  ui.renderDamage(round.distortion, round.level, eased);
+  ui.setTape(round.distortion, round.level, eased);
   ui.renderGuesses(round.guesses, animateLast);
   ui.renderPeeks(round.peeks, round.canPeek);
   ui.setWorth(round.isOver ? round.points : round.potentialPoints);
-  visualizer.setDistortion(round.activeLayers.length);
+  visualizer.setDistortion(round.stepsLeft);
 }
 
 /* ---------- Audio ---------- */
@@ -240,13 +275,14 @@ function playClip({ clean = false } = {}) {
   if (!round) {
     return;
   }
-  const layers = clean ? [] : round.activeLayers;
-  player.play({ layers, intensity: intensityForTier(round.tier), start: app.clipStart });
+  const damage = clean ? null : round.damage;
+  // The song's ID fixes where Chewed and Warp strike, the same for everyone.
+  player.play({ damage, start: app.clipStart, seed: round.song.id % 1000003 });
 
   visualizer.setAnalyser(player.getAnalyser());
   visualizer.start();
   ui.setPlaying(true);
-  ui.setOsdState(layers.includes("reversed") ? "rewind" : "play");
+  ui.setOsdState(damage ? "damaged" : "play", damage ? DISTORTIONS[damage.type].osd : "");
   trackProgress();
 }
 
@@ -318,10 +354,9 @@ async function submitGuess(event) {
     return;
   }
 
-  const removedBefore = round.activeLayers[0];
   const result = round.guess(song);
   autocomplete.clear();
-  afterTry(result, removedBefore);
+  afterTry(result);
 }
 
 function skip() {
@@ -329,14 +364,13 @@ function skip() {
   if (!round || round.isOver) {
     return;
   }
-  const removedBefore = round.activeLayers[0];
   round.skip();
   autocomplete.clear();
-  afterTry("skip", removedBefore);
+  afterTry("skip");
 }
 
-/** After any guess or skip: save, give feedback, and either reveal or unwarp. */
-function afterTry(result, removedLayer) {
+/** After any guess or skip: save, give feedback, and either reveal or ease the damage. */
+function afterTry(result) {
   const round = app.round;
   saveProgress();
 
@@ -359,18 +393,19 @@ function afterTry(result, removedLayer) {
     playBlip(feedback.blip);
   }
   const triesLeft = MAX_TRIES - round.guesses.length;
-  const unwarp = round.activeLayers.length === 0
-    ? `${LAYER_LABELS[removedLayer]} is off. Last try: this is the real song.`
-    : `${LAYER_LABELS[removedLayer]} is off. ${triesLeft} tries left.`;
+  const distortion = DISTORTIONS[round.distortion];
+  const unwarp = round.level === null
+    ? "Last try: this is the real song."
+    : `${distortion.name} eased to ${distortion.levels[round.level].label}. ${triesLeft} tries left.`;
   ui.setMessage(`${feedback.text} ${unwarp}`, feedback.tone);
-  renderRound(removedLayer, true);
+  renderRound(true, true);
 
-  // Play the slightly clearer version right away.
+  // Play the slightly clearer version once the tape's repair animation has shown.
   setTimeout(() => {
     if (app.round === round && !round.isOver) {
       playClip();
     }
-  }, 650);
+  }, 1000);
 }
 
 /* ---------- Peeks ---------- */
@@ -457,7 +492,8 @@ function showReveal(playSong) {
   ui.setPlayEnabled(true);
   ui.showPicture("art", coverFor(round.song));
   ui.setMessage("");
-  ui.renderLayers([]);
+  ui.renderDamage(round.distortion, null);
+  ui.setTape(null, null);
   visualizer.setDistortion(0);
 
   const isLastDaily = app.mode === "daily" && app.day.current === TRACKS_PER_DAY - 1;
@@ -674,6 +710,11 @@ for (const button of elements.modeButtons) {
 elements.genreSelect.addEventListener("change", () => {
   app.free.genre = elements.genreSelect.value;
   renderFreeFilters();
+  loadFreeTrack();
+});
+
+elements.distortionSelect.addEventListener("change", () => {
+  app.free.distortion = elements.distortionSelect.value;
   loadFreeTrack();
 });
 

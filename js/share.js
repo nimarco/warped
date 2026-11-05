@@ -6,6 +6,8 @@
  * blocked, copyText returns false and the page shows the text to copy by hand.
  */
 
+import { DISTORTIONS } from "./config.js";
+
 const RESULT_EMOJI = {
   correct: "🟩",
   artist: "🟨",
@@ -19,7 +21,7 @@ const PEEK_EMOJI = "👁️";
 /**
  * @param {object} options
  * @param {number} options.puzzleNumber
- * @param {{ guesses: { result: string }[], peeks: number }[]} options.rounds
+ * @param {{ distortion: string, guesses: { result: string }[], peeks: number }[]} options.rounds
  * @param {number} options.total
  * @param {number} options.streak
  */
@@ -27,7 +29,9 @@ export function buildShareText({ puzzleNumber, rounds, total, streak }) {
   const lines = rounds.map((round, index) => {
     const tries = round.guesses.map((guess) => RESULT_EMOJI[guess.result]).join("");
     const peeks = PEEK_EMOJI.repeat(round.peeks);
-    return `${index + 1} ${tries}${peeks}`;
+    // The damage's emoji shows which kind each track had (⏩ ⏪ 🕺 🧱).
+    const damage = DISTORTIONS[round.distortion]?.emoji ?? `${index + 1}`;
+    return `${damage} ${tries}${peeks}`;
   });
 
   const streakLine = streak > 1 ? `\n🔥 ${streak}-day streak` : "";

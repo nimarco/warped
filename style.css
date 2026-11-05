@@ -408,7 +408,7 @@ svg {
   font-size: 14px;
 }
 
-/* ---------- Layer chips ---------- */
+/* ---------- Distortion chips ---------- */
 
 .chip {
   --chip-color: var(--text);
@@ -432,21 +432,40 @@ svg {
   letter-spacing: 0;
 }
 
-.chip[data-layer="reversed"] { --chip-color: var(--accent); }
-.chip[data-layer="reversed"]::before { content: "◀◀"; }
-.chip[data-layer="static"] { --chip-color: var(--cyan); }
-.chip[data-layer="static"]::before { content: "▒"; font-size: 15px; }
-.chip[data-layer="warble"] { --chip-color: var(--partial); }
-.chip[data-layer="warble"]::before { content: "∿"; font-size: 17px; }
+.chip[data-layer="fastforward"] { --chip-color: var(--cyan); }
+.chip[data-layer="fastforward"]::before { content: "▶▶"; }
+.chip[data-layer="rewind"] { --chip-color: var(--accent); }
+.chip[data-layer="rewind"]::before { content: "◀◀"; }
+.chip[data-layer="rickroll"] { --chip-color: var(--partial); }
+.chip[data-layer="rickroll"]::before { content: "●"; font-size: 13px; }
+.chip[data-layer="chewed"] { --chip-color: #ff9f43; }
+.chip[data-layer="chewed"]::before { content: "▒"; font-size: 15px; }
+.chip[data-layer="warp"] { --chip-color: #f78cff; }
+.chip[data-layer="warp"]::before { content: "∿"; font-size: 17px; }
 .chip[data-layer="muffled"] { --chip-color: #b99cff; }
 .chip[data-layer="muffled"]::before { content: "◖"; font-size: 14px; }
+
+/* The damage track: steps carry no icon; the step playing now is filled in. */
+.chip.chip-step[data-layer]::before {
+  content: none;
+}
+
+.chip-step[aria-current="step"] {
+  background: var(--chip-color);
+  color: var(--bg);
+}
+
+.chip-title {
+  border-color: transparent;
+  padding-left: 0;
+}
 
 .chip-small {
   padding: 2px 9px 2px 8px;
   font-size: 17px;
 }
 
-/* A removed layer: struck out and faded */
+/* A step already eased: struck out and faded */
 .chip.is-off {
   --chip-color: var(--text-faint);
   border-style: dashed;
@@ -517,6 +536,8 @@ svg {
 .intro-layers .chip:nth-child(2) { animation-delay: 0.08s; }
 .intro-layers .chip:nth-child(3) { animation-delay: 0.16s; }
 .intro-layers .chip:nth-child(4) { animation-delay: 0.24s; }
+.intro-layers .chip:nth-child(5) { animation-delay: 0.32s; }
+.intro-layers .chip:nth-child(6) { animation-delay: 0.4s; }
 
 @keyframes chip-in {
   from { opacity: 0; transform: translateY(8px); }
@@ -664,6 +685,264 @@ svg {
 @keyframes picture-in {
   0% { opacity: 0; filter: blur(12px) saturate(2); transform: scale(1.04); }
   100% { opacity: 1; filter: none; transform: none; }
+}
+
+/* ---------- The cassette: what kind of damage the tape has ----------
+   ui.js sets data-damage (fastforward, rewind, rickroll, chewed, warp, muffled)
+   and data-level (0 = worst, 3 = mildest) on .tape, and adds .is-easing for a
+   moment when the damage eases. Everything else happens here. */
+
+.tape {
+  --reel-speed: 2.4s;
+  --reel-direction: normal;
+  position: absolute;
+  inset: 15% 10% 12%;
+  display: grid;
+  place-items: center;
+  transition: opacity 0.4s;
+}
+
+.tape-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* The page gives icons a currentColor outline; the cassette sets its own. */
+.tape-svg {
+  fill: none;
+  stroke: none;
+}
+
+/* While the clip plays, the sound bars take over and the tape fades back. */
+.tv.is-playing .tape {
+  opacity: 0.22;
+}
+
+.tv:not(.is-playing) .tv-visualizer {
+  opacity: 0;
+}
+
+.tv-visualizer {
+  transition: opacity 0.4s;
+}
+
+.tape.is-easing .tape-svg {
+  animation: tape-jolt 0.5s steps(3);
+}
+
+@keyframes tape-jolt {
+  25% { transform: translate(-6px, 2px); filter: hue-rotate(60deg); }
+  50% { transform: translate(5px, -2px); }
+  75% { transform: translate(-2px, 0); }
+}
+
+.cassette-body { fill: #2a2430; stroke: #463d50; stroke-width: 2; }
+.cassette-label { fill: var(--text); }
+.cassette-stripe { fill: var(--accent); }
+.cassette-name {
+  fill: var(--accent-ink);
+  font-family: var(--font-mono);
+  font-size: 26px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.cassette-window { fill: #0e0c10; }
+.cassette-tape { stroke: #5b3a24; stroke-width: 6; }
+.cassette-head { fill: #221d27; stroke: #463d50; stroke-width: 2; }
+.cassette-hole { fill: #0e0c10; }
+
+.reel {
+  animation: spin var(--reel-speed) linear infinite var(--reel-direction);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.reel circle { fill: var(--text); }
+.reel path { stroke: #2a2430; stroke-width: 4; stroke-linecap: round; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Damage-specific parts stay hidden unless their damage is on. */
+.ff-lines,
+.bites,
+.spaghetti,
+.dog,
+.rick,
+.wall {
+  display: none;
+}
+
+/* ▶▶ Fast-forward: reels flat out, speed streaks. Slower each step. */
+.tape[data-damage="fastforward"] { --reel-speed: 0.16s; }
+.tape[data-damage="fastforward"][data-level="1"] { --reel-speed: 0.26s; }
+.tape[data-damage="fastforward"][data-level="2"] { --reel-speed: 0.42s; }
+.tape[data-damage="fastforward"][data-level="3"] { --reel-speed: 0.7s; }
+.tape[data-damage="fastforward"] .ff-lines { display: inline; }
+
+.ff-lines line {
+  stroke: var(--cyan);
+  stroke-width: 3;
+  stroke-linecap: round;
+  animation: streak calc(var(--reel-speed) * 4) linear infinite;
+}
+
+.ff-lines line:nth-child(2) { animation-delay: -0.3s; }
+.ff-lines line:nth-child(3) { animation-delay: -0.6s; }
+
+@keyframes streak {
+  from { transform: translateX(-40px); opacity: 0; }
+  20% { opacity: 1; }
+  to { transform: translateX(360px); opacity: 0; }
+}
+
+/* ◀◀ Rewind: reels spin backwards, slower each step. */
+.tape[data-damage="rewind"] { --reel-direction: reverse; --reel-speed: 0.18s; }
+.tape[data-damage="rewind"][data-level="1"] { --reel-speed: 0.3s; }
+.tape[data-damage="rewind"][data-level="2"] { --reel-speed: 0.5s; }
+.tape[data-damage="rewind"][data-level="3"] { --reel-speed: 0.85s; }
+
+/* ● Rickrolled: a sticker slapped over the label, peeling off each step. */
+.tape[data-damage="rickroll"] .rick { display: inline; }
+
+.rick-sticker {
+  transform-box: fill-box;
+  transform-origin: 0 100%;
+  transform: rotate(-6deg);
+  transition: transform 0.7s var(--ease-out), opacity 0.7s;
+}
+
+.rick-sticker rect { fill: var(--partial); stroke: #1d0610; stroke-width: 2; }
+.rick-sticker text {
+  fill: #1d0610;
+  font-family: var(--font-mono);
+  font-size: 26px;
+  text-anchor: middle;
+  letter-spacing: 0.04em;
+}
+
+.tape[data-level="1"] .rick-sticker { transform: rotate(-14deg) translate(8px, -6px); opacity: 0.85; }
+.tape[data-level="2"] .rick-sticker { transform: rotate(-24deg) translate(18px, -14px); opacity: 0.6; }
+.tape[data-level="3"] .rick-sticker { transform: rotate(-36deg) translate(30px, -24px); opacity: 0.35; }
+
+.rec-dot { fill: var(--wrong); animation: blink 1s steps(2) infinite; }
+.rec-text { fill: var(--wrong); font-family: var(--font-mono); font-size: 18px; text-anchor: end; }
+
+/* ▒ Chewed: a dog chomping the corner, tape spilling out, bite marks.
+   Each step patches a bite and pulls some tape back in. */
+.tape[data-damage="chewed"] .bites,
+.tape[data-damage="chewed"] .spaghetti,
+.tape[data-damage="chewed"] .dog {
+  display: inline;
+}
+
+.bites circle {
+  fill: #141117;
+  transition: opacity 0.5s, transform 0.5s var(--ease-out);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.tape[data-level="1"] .bites circle:nth-child(1),
+.tape[data-level="2"] .bites circle:nth-child(-n + 2),
+.tape[data-level="3"] .bites circle:nth-child(-n + 3) {
+  opacity: 0;
+  transform: scale(0.2);
+}
+
+.spaghetti path {
+  fill: none;
+  stroke: #5b3a24;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 100 100;
+  transition: stroke-dasharray 0.7s var(--ease-out);
+  animation: wiggle 0.9s ease-in-out infinite alternate;
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+}
+
+.spaghetti path:nth-child(2) { animation-delay: -0.4s; }
+.tape[data-level="1"] .spaghetti path { stroke-dasharray: 70 100; }
+.tape[data-level="2"] .spaghetti path { stroke-dasharray: 42 100; }
+.tape[data-level="3"] .spaghetti path { stroke-dasharray: 18 100; }
+
+@keyframes wiggle {
+  from { transform: rotate(-3deg); }
+  to { transform: rotate(3deg); }
+}
+
+.dog { animation: dog-bob 0.6s ease-in-out infinite alternate; }
+.dog-head, .dog-jaw { fill: #c98a4b; }
+.dog-ear { fill: #7a4a26; }
+.dog-snout { fill: #e0b07a; }
+.dog-nose, .dog-eye { fill: #1a1012; }
+
+.dog-jaw {
+  animation: chomp 0.32s ease-in-out infinite alternate;
+  transform-box: fill-box;
+  transform-origin: 100% 0;
+}
+
+@keyframes chomp {
+  to { transform: rotate(16deg); }
+}
+
+@keyframes dog-bob {
+  to { transform: translate(-3px, 2px) rotate(-2deg); }
+}
+
+/* ∿ Warp: the whole tape ripples (scale set in ui.js) and wobbles. */
+.tape[data-damage="warp"] .cassette {
+  filter: url(#warp-filter);
+  animation: warp-wobble 1.3s ease-in-out infinite alternate;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes warp-wobble {
+  from { transform: rotate(-3deg) skewX(4deg); }
+  to { transform: rotate(3deg) skewX(-4deg); }
+}
+
+.tape[data-damage="warp"][data-level="2"] .cassette,
+.tape[data-damage="warp"][data-level="3"] .cassette {
+  animation-duration: 2.4s;
+}
+
+/* ◖ Muffled: a brick wall in front, with TV static over it.
+   A row of bricks falls off and the static fades each step. */
+.wall-static {
+  fill: #fff;
+  mix-blend-mode: screen;
+  opacity: 0.5;
+  transition: opacity 0.8s;
+}
+
+.tape[data-level="1"] .wall-static { opacity: 0.32; }
+.tape[data-level="2"] .wall-static { opacity: 0.17; }
+.tape[data-level="3"] .wall-static { opacity: 0.06; }
+
+.tape[data-damage="muffled"] .wall { display: inline; }
+
+.wall-row {
+  stroke: #1c1418;
+  stroke-width: 2;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  transition: transform 0.8s cubic-bezier(0.55, 0, 1, 0.45), opacity 0.8s;
+}
+
+.tape[data-level="1"] .wall-row-0,
+.tape[data-level="2"] .wall-row-0,
+.tape[data-level="2"] .wall-row-1,
+.tape[data-level="3"] .wall-row-0,
+.tape[data-level="3"] .wall-row-1,
+.tape[data-level="3"] .wall-row-2 {
+  transform: translateY(240px) rotate(10deg);
+  opacity: 0;
 }
 
 /* Scanlines and a curved-glass shine on top of everything */
@@ -1372,11 +1651,14 @@ dd {
   color: var(--text);
 }
 
-.help-layers {
-  display: flex;
-  flex-wrap: wrap;
+.help-damage {
+  display: grid;
   gap: 6px;
   margin-top: 8px;
+}
+
+.help-damage .chip {
+  margin-right: 6px;
 }
 
 .help-legend {

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Warped · The daily song game</title>
-  <meta name="description" content="Name the song before it un-warps. Four songs a day, starting reversed, crunchy, wobbly and muffled. Every wrong guess makes it clearer.">
+  <meta name="description" content="Name the song before it un-warps. Four songs a day, each with its own tape damage: fast-forwarded, rewound, Rickrolled, chewed, warped or muffled. Every wrong guess makes it clearer.">
   <meta name="theme-color" content="#0e0c10">
 
   <meta property="og:title" content="Warped · The daily song game">
@@ -47,14 +47,16 @@
     <section class="screen intro" id="intro-screen" aria-labelledby="intro-title">
       <p class="eyebrow">Daily tape <span class="mono" id="intro-number">#1</span> · <span id="intro-date"></span></p>
       <h1 class="intro-title" id="intro-title">Name the song<br>before it <span class="glitch" data-text="un-warps">un-warps</span>.</h1>
-      <p class="intro-lede">Four songs. Each one starts reversed, crunchy, wobbly and muffled. Every wrong guess peels off a layer, and the fewer layers you need, the more you score.</p>
+      <p class="intro-lede">Four songs, each with its own kind of tape damage. Every wrong guess eases the damage a step, and the sooner you name it, the more you score.</p>
 
-      <ol class="intro-layers" aria-label="The four layers, removed in this order">
-        <li class="chip" data-layer="reversed">Reversed</li>
-        <li class="chip" data-layer="static">Static</li>
-        <li class="chip" data-layer="warble">Warble</li>
+      <ul class="intro-layers" aria-label="The kinds of damage">
+        <li class="chip" data-layer="fastforward">Fast-forward</li>
+        <li class="chip" data-layer="rewind">Rewind</li>
+        <li class="chip" data-layer="rickroll">Rickrolled</li>
+        <li class="chip" data-layer="chewed">Chewed</li>
+        <li class="chip" data-layer="warp">Warp</li>
         <li class="chip" data-layer="muffled">Muffled</li>
-      </ol>
+      </ul>
 
       <button class="button button-primary button-big" id="start-button" type="button">
         <svg class="icon-solid" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>
@@ -74,6 +76,10 @@
           <select class="select" id="genre-select"></select>
         </div>
         <div class="free-filter">
+          <label class="free-label" for="distortion-select">Damage</label>
+          <select class="select" id="distortion-select"></select>
+        </div>
+        <div class="free-filter">
           <label class="free-label" for="decade-select">Era</label>
           <select class="select" id="decade-select"></select>
         </div>
@@ -82,6 +88,89 @@
 
       <div class="deck">
         <div class="tv" id="tv">
+          <!-- The cassette: shows what kind of damage the tape has (styles in style.css, state set by ui.js) -->
+          <div class="tape" id="tape" hidden>
+            <svg class="tape-svg" viewBox="-20 -14 380 228" aria-hidden="true">
+              <defs>
+                <filter id="warp-filter" x="-15%" y="-15%" width="130%" height="130%">
+                  <feTurbulence type="turbulence" baseFrequency="0.008 0.022" numOctaves="1" seed="4" result="noise">
+                    <animate attributeName="baseFrequency" dur="2.6s" values="0.008 0.022;0.013 0.016;0.008 0.022" repeatCount="indefinite"/>
+                  </feTurbulence>
+                  <feDisplacementMap id="warp-displace" in="SourceGraphic" in2="noise" scale="0" xChannelSelector="R" yChannelSelector="G"/>
+                </filter>
+                <filter id="static-filter" x="0" y="0" width="100%" height="100%">
+                  <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="1">
+                    <animate attributeName="seed" dur="0.32s" values="1;2;3;4" calcMode="discrete" repeatCount="indefinite"/>
+                  </feTurbulence>
+                  <feColorMatrix type="saturate" values="0"/>
+                </filter>
+                <pattern id="bricks" width="60" height="24" patternUnits="userSpaceOnUse">
+                  <rect width="60" height="24" fill="#3a2a2c"/>
+                  <rect x="1" y="1" width="58" height="10" rx="1.5" fill="#9b4f3e"/>
+                  <rect x="-29" y="13" width="58" height="10" rx="1.5" fill="#8a4436"/>
+                  <rect x="31" y="13" width="58" height="10" rx="1.5" fill="#a65a46"/>
+                </pattern>
+              </defs>
+
+              <g class="ff-lines">
+                <line x1="-20" y1="52" x2="40" y2="52"/>
+                <line x1="-20" y1="100" x2="60" y2="100"/>
+                <line x1="-20" y1="148" x2="30" y2="148"/>
+              </g>
+
+              <g class="cassette">
+                <rect class="cassette-body" x="10" y="10" width="300" height="180" rx="14"/>
+                <rect class="cassette-label" x="30" y="22" width="260" height="96" rx="6"/>
+                <rect class="cassette-stripe" x="30" y="34" width="260" height="8"/>
+                <text class="cassette-name" id="tape-label" x="44" y="66"></text>
+                <rect class="cassette-window" x="88" y="74" width="144" height="36" rx="18"/>
+                <path class="cassette-tape" d="M112 106 H208"/>
+                <g transform="translate(118 92)"><g class="reel"><circle r="15"/><path d="M0 -15V-6M13 7.5L5.2 3M-13 7.5L-5.2 3"/></g></g>
+                <g transform="translate(202 92)"><g class="reel"><circle r="15"/><path d="M0 -15V-6M13 7.5L5.2 3M-13 7.5L-5.2 3"/></g></g>
+                <path class="cassette-head" d="M70 190 L86 140 H234 L250 190 Z"/>
+                <circle class="cassette-hole" cx="128" cy="166" r="6"/>
+                <circle class="cassette-hole" cx="192" cy="166" r="6"/>
+                <g class="bites">
+                  <circle cx="246" cy="10" r="10"/>
+                  <circle cx="278" cy="12" r="9"/>
+                  <circle cx="310" cy="44" r="10"/>
+                  <circle cx="310" cy="82" r="9"/>
+                </g>
+              </g>
+
+              <g class="spaghetti">
+                <path pathLength="100" d="M150 110 C 132 150, 92 128, 104 172 S 168 214, 150 168 S 196 140, 214 186"/>
+                <path pathLength="100" d="M176 110 C 196 146, 236 132, 226 174 S 176 206, 196 196"/>
+              </g>
+
+              <g class="dog">
+                <ellipse class="dog-head" cx="306" cy="128" rx="30" ry="27"/>
+                <path class="dog-ear" d="M316 104 q 24 -8 22 26 q -12 2 -18 -12 z"/>
+                <ellipse class="dog-snout" cx="276" cy="138" rx="22" ry="12"/>
+                <circle class="dog-nose" cx="256" cy="134" r="5.5"/>
+                <circle class="dog-eye" cx="298" cy="118" r="3.5"/>
+                <path class="dog-jaw" d="M258 148 q 18 14 40 2 l 0 -6 q -20 6 -40 4 z"/>
+              </g>
+
+              <g class="rick">
+                <g class="rick-sticker">
+                  <rect x="56" y="30" width="208" height="70" rx="4"/>
+                  <text x="160" y="60">NEVER GONNA</text>
+                  <text x="160" y="88">GIVE YOU UP</text>
+                </g>
+                <circle class="rec-dot" cx="292" cy="0" r="6"/>
+                <text class="rec-text" x="276" y="5">REC</text>
+              </g>
+
+              <g class="wall">
+                <rect class="wall-row wall-row-0" x="-6" y="2" width="332" height="48" fill="url(#bricks)"/>
+                <rect class="wall-row wall-row-1" x="-6" y="50" width="332" height="48" fill="url(#bricks)"/>
+                <rect class="wall-row wall-row-2" x="-6" y="98" width="332" height="48" fill="url(#bricks)"/>
+                <rect class="wall-row wall-row-3" x="-6" y="146" width="332" height="50" fill="url(#bricks)"/>
+                <rect class="wall-static" x="-6" y="2" width="332" height="194" filter="url(#static-filter)"/>
+              </g>
+            </svg>
+          </div>
           <canvas class="tv-visualizer" id="visualizer" aria-hidden="true"></canvas>
           <canvas class="tv-picture" id="peek-canvas" role="img" aria-label="Pixelated album cover hint" hidden></canvas>
           <video class="tv-picture" id="peek-video" muted playsinline loop aria-label="Music video hint" hidden></video>
@@ -97,7 +186,7 @@
           </div>
         </div>
 
-        <ol class="layers" id="layers" aria-label="Distortion layers still on"></ol>
+        <ol class="layers" id="layers" aria-label="Tape damage"></ol>
 
         <div class="transport">
           <button class="play-button" id="play-button" type="button" aria-label="Play the clip" disabled>
@@ -206,12 +295,14 @@
         <strong>Press play.</strong> You'll hear 10 seconds of a song, badly warped. Replay it as often as you like.
       </li>
       <li>
-        <strong>Guess the song.</strong> Search by title or artist and pick from the list. Each wrong guess or skip removes a layer:
-        <span class="help-layers">
-          <span class="chip chip-small" data-layer="reversed">Reversed</span>
-          <span class="chip chip-small" data-layer="static">Static</span>
-          <span class="chip chip-small" data-layer="warble">Warble</span>
-          <span class="chip chip-small" data-layer="muffled">Muffled</span>
+        <strong>Guess the song.</strong> Search by title or artist and pick from the list. Each track has one kind of damage, and each wrong guess or skip eases it a step until try 5 plays the real song:
+        <span class="help-damage">
+          <span><span class="chip chip-small" data-layer="fastforward">Fast-forward</span> too fast and too high</span>
+          <span><span class="chip chip-small" data-layer="rewind">Rewind</span> chopped into backwards pieces</span>
+          <span><span class="chip chip-small" data-layer="rickroll">Rickrolled</span> Never Gonna Give You Up taped over it</span>
+          <span><span class="chip chip-small" data-layer="chewed">Chewed</span> a dog got to the tape</span>
+          <span><span class="chip chip-small" data-layer="warp">Warp</span> the pitch cracks like a breaking voice</span>
+          <span><span class="chip chip-small" data-layer="muffled">Muffled</span> through a wall, on a crackly tape</span>
         </span>
       </li>
       <li>
@@ -224,7 +315,7 @@
       <span><span class="legend-box legend-wrong"></span>Wrong</span>
       <span><span class="legend-box legend-skip"></span>Skipped</span>
     </p>
-    <p class="help-footnote">A new tape of four songs drops every day at midnight. Free Play is unlimited and doesn't count toward your stats.</p>
+    <p class="help-footnote">A new tape of four songs drops every day at midnight, with four of the six kinds of damage. Free Play is unlimited and doesn't count toward your stats.</p>
   </dialog>
 
   <!-- Stats -->

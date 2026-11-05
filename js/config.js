@@ -4,33 +4,99 @@
  * never means hunting through logic code.
  */
 
-// The four distortion layers, in the order they are removed.
-// Each wrong guess or skip peels off the first remaining layer.
-export const LAYER_ORDER = ["reversed", "static", "warble", "muffled"];
-
-export const LAYER_LABELS = {
-  reversed: "Reversed",
-  static: "Static",
-  warble: "Warble",
-  muffled: "Muffled",
+// The kinds of tape damage. Each day uses four of them, one per track, and
+// every wrong guess or skip turns it down one step: try 1 uses levels[0],
+// try 4 uses levels[3], and try 5 is the clean song.
+// `value` is the setting warp.js uses; `label` is what the screen shows.
+export const DISTORTIONS = {
+  fastforward: {
+    name: "Fast-forward",
+    osd: "▶▶ FF",
+    emoji: "⏩",
+    about: "too fast and too high, slowing down each try",
+    // Playback speed. Higher pitch hides who's singing until it slows down.
+    levels: [
+      { value: 2.5, label: "2.5×" },
+      { value: 2, label: "2×" },
+      { value: 1.6, label: "1.6×" },
+      { value: 1.3, label: "1.3×" },
+    ],
+  },
+  rewind: {
+    name: "Rewind",
+    osd: "◀◀ REW",
+    emoji: "⏪",
+    about: "chopped into pieces that play backwards, smaller each try",
+    // Seconds per backwards piece. A whole clip (10) is simply reversed.
+    levels: [
+      { value: 10, label: "Backwards" },
+      { value: 1, label: "1 s chops" },
+      { value: 0.25, label: "¼ s chops" },
+      { value: 0.06, label: "Tiny chops" },
+    ],
+  },
+  rickroll: {
+    name: "Rickrolled",
+    osd: "● REC",
+    emoji: "🕺",
+    about: "someone taped Never Gonna Give You Up over it, and it fades each try",
+    // Rick's loudness compared with the song's (1 = equally loud). Labels show it as a %.
+    levels: [
+      { value: 1.6, label: "160%" },
+      { value: 1, label: "100%" },
+      { value: 0.55, label: "55%" },
+      { value: 0.25, label: "25%" },
+    ],
+  },
+  chewed: {
+    name: "Chewed",
+    osd: "▒ CHEWED",
+    emoji: "🐕",
+    about: "a dog got to the tape, and each try patches a few holes",
+    // Share of the clip left intact. Patches never move: what you heard stays.
+    levels: [
+      { value: 0.05, label: "Shredded" },
+      { value: 0.25, label: "Mauled" },
+      { value: 0.5, label: "Bitten" },
+      { value: 0.75, label: "Nibbled" },
+    ],
+  },
+  warp: {
+    name: "Warp",
+    osd: "∿ WARP",
+    emoji: "🌀",
+    about: "the pitch cracks up and down like a breaking voice, steadier each try",
+    // value: biggest pitch jump in semitones (12 = an octave).
+    // chunk: about how many seconds between cracks (shorter = more often).
+    levels: [
+      { value: 9, chunk: 0.14, label: "±9 notes" },
+      { value: 6, chunk: 0.2, label: "±6" },
+      { value: 3.5, chunk: 0.3, label: "±3.5" },
+      { value: 1.5, chunk: 0.45, label: "±1.5" },
+    ],
+  },
+  muffled: {
+    name: "Muffled",
+    osd: "◖ MUFFLED",
+    emoji: "🧱",
+    about: "heard through a wall on a crackly, crunchy tape, clearer each try",
+    // value: low-pass cutoff in Hz (the wall). static: how loud the static is
+    // next to the song (1 = equally loud); it also sets how crunchy the tape is.
+    levels: [
+      { value: 150, static: 0.9, label: "Next door" },
+      { value: 350, static: 0.55, label: "Thick wall" },
+      { value: 800, static: 0.28, label: "Thin wall" },
+      { value: 1800, static: 0.08, label: "Pillow" },
+    ],
+  },
 };
 
-// How strong each layer is, from 0 (barely there) to 1 (maximum).
-// warp.js turns these into actual audio settings.
-export const LAYER_INTENSITY = {
-  static: 0.6,
-  warble: 0.55,
-  muffled: 0.6,
-};
+export const DISTORTION_ORDER = Object.keys(DISTORTIONS);
 
-// Later tracks in the day get stronger distortion.
-// The layer intensity is multiplied by this value (capped at 1).
-export const TIER_MULTIPLIER = {
-  1: 0.75,
-  2: 0.9,
-  3: 1,
-  4: 1.15,
-};
+// The Rick Roll's iTunes track ID, for the "rickroll" distortion. If the
+// answer is Rick Astley himself, that track uses FALLBACK_DISTORTION instead.
+export const RICKROLL_TRACK_ID = 1559885421;
+export const FALLBACK_DISTORTION = "muffled";
 
 export const TIER_NAMES = {
   1: "Easy",

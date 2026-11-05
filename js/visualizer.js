@@ -2,7 +2,7 @@
  * visualizer.js — BROWSER API: Canvas API (with the Web Audio AnalyserNode)
  *
  * Draws the "TV screen": frequency bars that react to the clip. The more
- * layers are still on, the more the picture glitches (color split and
+ * damage is left, the more the picture glitches (color split and
  * tracking-error bands), so the screen gets cleaner as the song does.
  */
 
@@ -50,9 +50,9 @@ export class Visualizer {
     this.data = new Uint8Array(analyser.frequencyBinCount);
   }
 
-  /** 0 = clean picture, 4 = all four layers on. */
-  setDistortion(layerCount) {
-    this.distortion = layerCount;
+  /** 0 = clean picture, 4 = the worst damage (try 1). */
+  setDistortion(steps) {
+    this.distortion = steps;
     if (!this.running) {
       this.drawIdle();
     }

@@ -4,7 +4,7 @@
  * they're given; the game decisions happen in game.js and main.js.
  */
 
-import { FREE_PLAY_GENRES, LAYER_LABELS, LAYER_ORDER, MAX_TRIES, TIER_NAMES } from "./config.js";
+import { DISTORTION_ORDER, DISTORTIONS, FREE_PLAY_GENRES, MAX_TRIES, TIER_NAMES } from "./config.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -34,8 +34,11 @@ export const elements = {
   trackProgress: $("track-progress"),
   freeBar: $("free-bar"),
   genreSelect: $("genre-select"),
+  distortionSelect: $("distortion-select"),
   decadeSelect: $("decade-select"),
 
+  tv: $("tv"),
+  tape: $("tape"),
   visualizer: $("visualizer"),
   peekCanvas: $("peek-canvas"),
   peekVideo: $("peek-video"),
@@ -134,6 +137,11 @@ export function renderGenres(counts, selected) {
   fillSelect(elements.genreSelect, options, selected);
 }
 
+export function renderDistortionChoices(selected) {
+  const options = [["mixed", "Mixed"], ...DISTORTION_ORDER.map((key) => [key, DISTORTIONS[key].name])];
+  fillSelect(elements.distortionSelect, options, selected);
+}
+
 export function renderDecades(decades, selected) {
   const options = [["all", "All eras"], ...decades.map((decade) => [String(decade), `${decade}s`])];
   fillSelect(elements.decadeSelect, options, selected);
@@ -150,13 +158,15 @@ export function setOsdTrack(text) {
   $("osd-track").textContent = text;
 }
 
-/** state: "stop" | "play" | "rewind" */
-export function setOsdState(state) {
+/**
+ * state: "stop" | "play" (the clean song) | "damaged" (shows `label`, like "▶▶ FF")
+ */
+export function setOsdState(state, label = "") {
   const osd = $("osd-state");
-  const labels = { stop: "STOP ■", play: "PLAY ▶", rewind: "◀◀ REW" };
+  const labels = { stop: "STOP ■", play: "PLAY ▶", damaged: label };
   osd.textContent = labels[state];
   osd.classList.toggle("is-playing", state === "play");
-  osd.classList.toggle("is-rewinding", state === "rewind");
+  osd.classList.toggle("is-rewinding", state === "damaged");
 }
 
 export function setOsdTime(seconds) {
@@ -181,6 +191,31 @@ export function setTvStatus(status) {
   elements.retryButton.hidden = !status.retry;
 }
 
+// How hard the Warp ripple pulls the cassette at each damage step (SVG displacement).
+const WARP_RIPPLE = [20, 12, 7, 3];
+
+/**
+ * The cassette on the TV: shows the track's damage and how bad it still is.
+ * Hidden once the song is clean. eased: play the "repair" jolt.
+ */
+export function setTape(distortion, level, eased = false) {
+  const tape = elements.tape;
+  tape.hidden = !distortion || level === null;
+  if (tape.hidden) {
+    return;
+  }
+  tape.dataset.damage = distortion;
+  tape.dataset.level = level;
+  $("tape-label").textContent = DISTORTIONS[distortion].name;
+  $("warp-displace").setAttribute("scale", WARP_RIPPLE[level]);
+  if (eased) {
+    tape.classList.remove("is-easing");
+    // Reading layout restarts the jolt animation when it's already running.
+    void tape.offsetWidth;
+    tape.classList.add("is-easing");
+  }
+}
+
 /** What the TV shows: "visualizer", "peek" (pixelated cover), "video" or "art". */
 export function showPicture(kind, art) {
   elements.visualizer.hidden = kind !== "visualizer";
@@ -200,6 +235,7 @@ export function showPicture(kind, art) {
 /* ---------- Controls ---------- */
 
 export function setPlaying(isPlaying) {
+  elements.tv.classList.toggle("is-playing", isPlaying);
   elements.playButton.classList.toggle("is-playing", isPlaying);
   elements.playButton.classList.remove("is-inviting");
   elements.playButton.setAttribute("aria-label", isPlaying ? "Stop the clip" : "Play the clip");
@@ -220,32 +256,46 @@ export function setWorth(points) {
   $("worth").textContent = points;
 }
 
-/** The layer chips: active layers, plus removed ones crossed out. */
-export function renderLayers(activeLayers, justRemoved = null) {
-  const active = new Set(activeLayers);
-  const chips = LAYER_ORDER.map((layer) => {
+/**
+ * The damage track: the distortion's name, then its four steps, with the
+ * steps already eased crossed out. level: the current step (0–3), or null when clean.
+ */
+export function renderDamage(distortion, level, eased = false) {
+  const { name, levels } = DISTORTIONS[distortion];
+  const title = document.createElement("li");
+  title.className = "chip chip-title";
+  title.dataset.layer = distortion;
+  title.textContent = name;
+
+  const current = level ?? levels.length;
+  const steps = levels.map((step, index) => {
     const chip = document.createElement("li");
-    chip.className = "chip";
-    chip.dataset.layer = layer;
-    chip.textContent = LAYER_LABELS[layer];
-    if (!active.has(layer)) {
+    chip.className = "chip chip-step";
+    chip.dataset.layer = distortion;
+    chip.textContent = step.label;
+    if (index < current) {
       chip.classList.add("is-off");
-      chip.setAttribute("aria-label", `${LAYER_LABELS[layer]} (removed)`);
+      chip.setAttribute("aria-label", `${step.label} (eased)`);
     }
-    if (layer === justRemoved) {
+    if (eased && index === current - 1) {
       chip.classList.add("is-removing");
+    }
+    if (index === current) {
+      chip.setAttribute("aria-current", "step");
     }
     return chip;
   });
 
-  if (activeLayers.length === 0) {
+  // Try 5 is always the clean song, so "Clean" only appears once it's reached.
+  if (level === null) {
     const clean = document.createElement("li");
     clean.className = "chip is-clean";
     clean.textContent = "Clean";
-    chips.push(clean);
+    steps.push(clean);
   }
 
-  $("layers").replaceChildren(...chips);
+  $("layers").setAttribute("aria-label", `${name}: ${level === null ? "clean" : levels[level].label}`);
+  $("layers").replaceChildren(title, ...steps);
 }
 
 /** tone: "wrong" | "partial" | "info" | "" */

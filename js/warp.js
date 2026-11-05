@@ -2,25 +2,32 @@
  * warp.js — BROWSER API: Web Audio API
  * https://developer.mozilla.org/docs/Web/API/Web_Audio_API
  *
- * Plays a song preview through live "tape damage" effects (layers):
+ * Plays a song preview through one of four kinds of live tape damage.
+ * Each takes one number (set in config.js), turned down every try:
  *
- *   reversed     the clip plays backwards (◀◀ REW)
- *   fastforward  sped up, so it's higher and rushed (▶▶ FF)
- *   melted       slowed down with a strong pitch wobble, like a tape left in the sun
- *   chewed       the player "eats" the tape: stutters, skips and dropouts
- *   static       bitcrush + tape hiss
- *   warble       slowed down with a gentle pitch wobble
- *   muffled      low-pass filter
+ *   fastforward  played too fast, so it's rushed and higher (value: speed)
+ *   rewind       cut into pieces that each play backwards (value: seconds per
+ *                piece; a whole 10-second piece is plain reversed)
+ *   rickroll     someone taped Never Gonna Give You Up over it (value: how
+ *                loud Rick is compared with the song)
+ *   chewed       patches of tape are chewed up: hiss, stutters, backwards bits
+ *                (value: share of the clip left intact; repairs never move)
+ *   warp         the pitch jumps up and down in chunks, like a voice cracking,
+ *                so the melody comes out wrong (value: biggest jump in semitones;
+ *                chunk: about how many seconds between cracks)
+ *   muffled      heard through a wall on a crackly, crunchy tape (value: low-pass
+ *                cutoff in Hz; static: how loud the static is next to the song)
  *
- * The signal path is: song → [static] → [muffled] → analyser → speakers.
- * Speed and pitch effects act on the song player itself, and "reversed" and
- * "chewed" change which audio it plays. Nothing is pre-rendered: changing
- * layers just rebuilds the chain.
+ * The signal path is: song (+ Rick) → [low-pass → bitcrusher, + static] → fade in/out → analyser → speakers.
+ * Nothing is pre-rendered: every play builds the chain fresh.
  */
 
 import { CLIP_SECONDS } from "./config.js";
 
 const FADE_SECONDS = 0.04;
+
+// Loudness (RMS) of the hiss buffer below: uniform noise at ±0.5 is about 0.29.
+const HISS_LOUDNESS = 0.29;
 
 let context = null;
 
@@ -49,38 +56,54 @@ export function audioUnlocked() {
   return context?.state === "running";
 }
 
-/** Blend between two numbers: t = 0 gives a, t = 1 gives b. */
-function lerp(a, b, t) {
-  return a + (b - a) * t;
-}
+/**
+ * Chopped reverse: cut the clip into pieces of `pieceSeconds` and play each
+ * piece backwards, keeping the pieces in order. Neighbouring pieces overlap
+ * by a few milliseconds and crossfade, so the cuts don't click.
+ */
+function chopReverseBuffer(ctx, buffer, start, duration, pieceSeconds) {
+  const rate = buffer.sampleRate;
+  const from = Math.floor(start * rate);
+  const length = Math.min(Math.floor(duration * rate), buffer.length - from);
+  const piece = Math.max(Math.floor(pieceSeconds * rate), 32);
+  const overlap = Math.max(Math.floor(Math.min(0.012, pieceSeconds / 4) * rate), 1);
+  const result = ctx.createBuffer(buffer.numberOfChannels, length, rate);
 
-/** Turn a 0–1 intensity into concrete effect settings. */
-export function settingsFor(intensity) {
-  const i = Math.min(Math.max(intensity, 0), 1);
-  return {
-    // Fewer bits = crunchier, like a cheap old recording.
-    bits: lerp(9, 2.5, i),
-    hiss: lerp(0.015, 0.14, i),
-    // Below 1 = slower and lower-pitched. The wobble mimics a warped record.
-    speed: lerp(0.94, 0.68, i),
-    wobbleCents: lerp(12, 90, i),
-    wobbleHz: lerp(0.4, 1.4, i),
-    // Low-pass cutoff in Hz (lower = more muffled). Exponential so it sounds even.
-    cutoff: 2200 * Math.pow(250 / 2200, i),
-    // Fast-forward: 1.4× (like a "sped up" TikTok edit) up to 2.4× (chipmunk).
-    fastSpeed: lerp(1.4, 2.4, i),
-    // Melted: much slower and wobblier than warble, enough to bend the melody.
-    meltSpeed: lerp(0.88, 0.62, i),
-    meltCents: lerp(150, 800, i),
-    meltHz: lerp(0.5, 1.3, i),
-    // Chewed: chance that each bit of tape stutters, skips ahead or drops out.
-    stutterChance: lerp(0.12, 0.35, i),
-    skipChance: lerp(0.05, 0.2, i),
-    dropoutChance: lerp(0.04, 0.18, i),
+  // Equal-power crossfade: sin² + cos² = 1 across each overlap.
+  const weight = (t, pieceStart, pieceEnd) => {
+    if (t < pieceStart + overlap) {
+      return Math.sin((Math.PI / 2) * Math.min(Math.max((t - (pieceStart - overlap)) / (2 * overlap), 0), 1));
+    }
+    if (t > pieceEnd - overlap) {
+      return Math.cos((Math.PI / 2) * Math.min(Math.max((t - (pieceEnd - overlap)) / (2 * overlap), 0), 1));
+    }
+    return 1;
   };
+
+  for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+    const source = buffer.getChannelData(channel);
+    const target = result.getChannelData(channel);
+    for (let pieceStart = 0; pieceStart < length; pieceStart += piece) {
+      const pieceEnd = Math.min(pieceStart + piece, length);
+      // Read a slightly wider window so the overlaps have audio to fade between.
+      const first = Math.max(pieceStart - overlap, 0);
+      const last = Math.min(pieceEnd + overlap, length);
+      for (let t = first; t < last; t++) {
+        const mirrored = first + last - 1 - t;
+        const fadeIn = pieceStart === 0 ? 1 : 0;
+        const fadeOut = pieceEnd === length ? 1 : 0;
+        let w = weight(t, pieceStart, pieceEnd);
+        if ((fadeIn && t < pieceStart + overlap) || (fadeOut && t > pieceEnd - overlap)) {
+          w = 1;
+        }
+        target[t] += source[from + mirrored] * w;
+      }
+    }
+  }
+  return result;
 }
 
-/** A tiny seeded random generator, so a chewed clip sounds the same on every replay. */
+/** A tiny seeded random generator, so damage sounds the same on every replay. */
 function seededRandom(seed) {
   let state = seed >>> 0 || 1;
   return () => {
@@ -90,65 +113,108 @@ function seededRandom(seed) {
 }
 
 /**
- * Build a "chewed tape" version of a clip: walk through it in short pieces,
- * and for each piece either play it, stutter (repeat a tiny slice), skip it,
- * or drop out to near silence. Every piece fades in and out so cuts don't click.
+ * Chewed tape: split the clip into short cells. Each cell gets a fixed random
+ * rank from the seed, and cells ranked above `keepFraction` are damaged
+ * (hiss, a stutter of the cell's start, or the cell backwards). The same
+ * seed with a higher keepFraction repairs some cells and never moves damage.
  */
-function chewBuffer(ctx, buffer, start, duration, settings, seed) {
+function chewBuffer(ctx, buffer, start, duration, keepFraction, seed) {
   const rate = buffer.sampleRate;
+  const from = Math.floor(start * rate);
+  const length = Math.min(Math.floor(duration * rate), buffer.length - from);
+  const cell = Math.floor(0.35 * rate);
+  const fade = Math.floor(rate * 0.008);
   const random = seededRandom(seed);
-  const seconds = (min, max) => Math.floor((min + random() * (max - min)) * rate);
-  const end = Math.min(Math.floor((start + duration) * rate), buffer.length);
-  let position = Math.floor(start * rate);
-
-  // Each entry: copy `length` samples from `from` (or silence if from is null).
-  const pieces = [];
-  while (position < end) {
-    const roll = random();
-    if (roll < settings.stutterChance) {
-      const slice = seconds(0.05, 0.12);
-      const repeats = 2 + Math.floor(random() * 3);
-      for (let count = 0; count < repeats; count++) {
-        pieces.push({ from: position, length: slice });
-      }
-      position += slice;
-    } else if (roll < settings.stutterChance + settings.skipChance) {
-      position += seconds(0.15, 0.4);
-    } else if (roll < settings.stutterChance + settings.skipChance + settings.dropoutChance) {
-      const gap = seconds(0.1, 0.25);
-      pieces.push({ from: null, length: gap });
-      position += gap;
-    } else {
-      const length = Math.min(seconds(0.2, 0.5), end - position);
-      pieces.push({ from: position, length });
-      position += length;
-    }
+  const cells = [];
+  for (let cellStart = 0; cellStart < length; cellStart += cell) {
+    cells.push({ start: cellStart, end: Math.min(cellStart + cell, length), rank: random(), damage: random() });
   }
 
-  const total = pieces.reduce((sum, piece) => sum + piece.length, 0);
-  const result = ctx.createBuffer(buffer.numberOfChannels, Math.max(total, 1), rate);
-  const fade = Math.floor(rate * 0.006);
-
+  const result = ctx.createBuffer(buffer.numberOfChannels, length, rate);
   for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
     const source = buffer.getChannelData(channel);
     const target = result.getChannelData(channel);
-    let writeAt = 0;
-    for (const piece of pieces) {
-      for (let offset = 0; offset < piece.length; offset++) {
-        const edge = Math.min(offset, piece.length - 1 - offset);
+    const noise = seededRandom(seed + 7);
+    for (const { start: cellStart, end, rank, damage } of cells) {
+      const size = end - cellStart;
+      const stutter = Math.max(Math.floor(size / 4), 1);
+      for (let t = cellStart; t < end; t++) {
+        const offset = t - cellStart;
+        const edge = Math.min(offset, size - 1 - offset);
         const envelope = edge < fade ? edge / fade : 1;
-        const sample = piece.from === null ? 0 : source[Math.min(piece.from + offset, source.length - 1)];
-        target[writeAt + offset] = sample * envelope;
+        let sample;
+        if (rank < keepFraction) {
+          sample = source[from + t];
+        } else if (damage < 0.4) {
+          sample = (noise() * 2 - 1) * 0.02; // chewed through: just hiss
+        } else if (damage < 0.7) {
+          sample = source[from + cellStart + (offset % stutter)]; // stutter
+        } else {
+          sample = source[from + end - 1 - offset]; // backwards
+        }
+        target[t] = sample * envelope;
       }
-      writeAt += piece.length;
     }
   }
   return result;
 }
 
-/** A curve that snaps the waveform to a few levels (a bitcrusher). */
+/**
+ * Warp: cut the clip into chunks of roughly `chunkSeconds` (0.7× to 1.4×) and
+ * shift each chunk's pitch up or down, keeping its timing, so the tune
+ * cracks like a voice. Shorter chunks crack more often. Each chunk's direction is fixed by the seed and scaled
+ * by `semitones`, so easing only shrinks the jumps.
+ * Pitch shifting without changing speed: short overlapping grains (Hann
+ * windows at 50% overlap add up to 1), each one read faster or slower.
+ */
+function crackBuffer(ctx, buffer, start, duration, semitones, chunkSeconds, seed) {
+  const rate = buffer.sampleRate;
+  const from = Math.floor(start * rate);
+  const length = Math.min(Math.floor(duration * rate), buffer.length - from);
+  const random = seededRandom(seed);
+
+  const chunks = [];
+  for (let position = 0; position < length; ) {
+    position += Math.max(Math.floor(chunkSeconds * (0.7 + random() * 0.7) * rate), 1);
+    const direction = random() * 2 - 1;
+    // Push most chunks clearly away from 0 so the jumps are audible.
+    const shift = Math.sign(direction) * (0.35 + 0.65 * Math.abs(direction)) * semitones;
+    chunks.push({ end: position, ratio: 2 ** (shift / 12) });
+  }
+
+  const grain = Math.floor(0.07 * rate);
+  const hop = Math.floor(grain / 2);
+  const window = Float32Array.from({ length: grain }, (_, index) => Math.sin((Math.PI * index) / grain) ** 2);
+  const result = ctx.createBuffer(buffer.numberOfChannels, length, rate);
+
+  for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+    const source = buffer.getChannelData(channel);
+    const target = result.getChannelData(channel);
+    let chunk = 0;
+    for (let center = 0; center < length + hop; center += hop) {
+      while (chunk < chunks.length - 1 && center >= chunks[chunk].end) {
+        chunk += 1;
+      }
+      const ratio = chunks[chunk].ratio;
+      for (let index = 0; index < grain; index++) {
+        const t = center - hop + index;
+        const read = center + (index - hop) * ratio;
+        if (t < 0 || t >= length || read < 0 || read >= length - 1) {
+          continue;
+        }
+        const whole = Math.floor(read);
+        const fraction = read - whole;
+        const sample = source[from + whole] * (1 - fraction) + source[from + whole + 1] * fraction;
+        target[t] += sample * window[index];
+      }
+    }
+  }
+  return result;
+}
+
+/** A curve that snaps the waveform to a few levels (a bitcrusher): fewer bits, more crunch. */
 function makeCrushCurve(bits) {
-  const steps = Math.pow(2, bits) / 2;
+  const steps = 2 ** bits / 2;
   const curve = new Float32Array(2048);
   for (let index = 0; index < curve.length; index++) {
     const x = (index / (curve.length - 1)) * 2 - 1;
@@ -168,30 +234,79 @@ function makeHissBuffer(ctx) {
   return buffer;
 }
 
-/** Make a backwards copy of an audio buffer. */
-function reverseBuffer(ctx, buffer) {
-  const reversed = ctx.createBuffer(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
-  for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
-    const source = buffer.getChannelData(channel);
-    const target = reversed.getChannelData(channel);
-    for (let index = 0; index < source.length; index++) {
-      target[index] = source[source.length - 1 - index];
+/** Loudest `duration` seconds of a buffer, as a start time in seconds. Usually the chorus. */
+function loudestStart(buffer, duration) {
+  const samples = buffer.getChannelData(0);
+  const rate = buffer.sampleRate;
+  const windowSize = Math.floor(rate / 2);
+  const energies = [];
+
+  for (let index = 0; index + windowSize <= samples.length; index += windowSize) {
+    let sum = 0;
+    for (let offset = 0; offset < windowSize; offset += 16) {
+      sum += samples[index + offset] ** 2;
+    }
+    energies.push(sum);
+  }
+
+  const windowsPerClip = Math.round(duration * 2);
+  let bestStart = 0;
+  let bestEnergy = -1;
+  for (let start = 0; start + windowsPerClip <= energies.length; start++) {
+    const energy = energies.slice(start, start + windowsPerClip).reduce((total, value) => total + value, 0);
+    if (energy > bestEnergy) {
+      bestEnergy = energy;
+      bestStart = start;
     }
   }
-  return reversed;
+  return bestStart / 2;
+}
+
+/** How loud a stretch of a buffer is (root mean square), sampled for speed. */
+function loudness(buffer, start, duration) {
+  const samples = buffer.getChannelData(0);
+  const from = Math.floor(start * buffer.sampleRate);
+  const to = Math.min(from + Math.floor(duration * buffer.sampleRate), samples.length);
+  let sum = 0;
+  let count = 0;
+  for (let index = from; index < to; index += 32) {
+    sum += samples[index] ** 2;
+    count += 1;
+  }
+  return Math.sqrt(sum / Math.max(count, 1)) || 1e-4;
+}
+
+/** Download and decode one preview. Throws a friendly error on failure. */
+async function decode(url) {
+  let audioData;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    audioData = await response.arrayBuffer();
+  } catch {
+    throw new Error("Couldn't download this song's audio.");
+  }
+  try {
+    return await getContext().decodeAudioData(audioData);
+  } catch {
+    throw new Error("This browser couldn't play this song's audio.");
+  }
 }
 
 /**
- * Loads one song and plays it with any combination of layers.
+ * Loads one song and plays it clean or with one kind of damage.
  *
  *   const player = new WarpPlayer();
  *   await player.load(song.previewUrl);
- *   player.play({ layers: ["static", "muffled"], intensity: 0.8, start: 12 });
+ *   player.play({ damage: { type: "fastforward", value: 2 }, start: 12 });
  */
 export class WarpPlayer {
   constructor() {
     this.buffer = null;
-    this.reversedBuffer = null;
+    this.overlay = null;
+    this.overlayUrl = null;
     this.nodes = [];
     this.playing = false;
     this.startedAt = 0;
@@ -201,29 +316,22 @@ export class WarpPlayer {
     this.analyser = null;
   }
 
-  /** Download and decode a preview. Throws a friendly error on failure. */
+  /** Download and decode a song's preview. */
   async load(url) {
-    const ctx = getContext();
     this.stop();
+    this.buffer = await decode(url);
+  }
 
-    let audioData;
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      audioData = await response.arrayBuffer();
-    } catch {
-      throw new Error("Couldn't download this song's audio.");
+  /** Download the Rick Roll once; later calls reuse it. */
+  async loadOverlay(url) {
+    if (this.overlayUrl !== url) {
+      this.overlay = await decode(url);
+      this.overlayUrl = url;
     }
+  }
 
-    try {
-      this.buffer = await ctx.decodeAudioData(audioData);
-    } catch {
-      throw new Error("This browser couldn't play this song's audio.");
-    }
-
-    this.reversedBuffer = reverseBuffer(ctx, this.buffer);
+  get hasOverlay() {
+    return this.overlay !== null;
   }
 
   /**
@@ -231,31 +339,7 @@ export class WarpPlayer {
    * The loudest part is usually the chorus, which makes the best clip.
    */
   findLoudestStart(duration = CLIP_SECONDS) {
-    const samples = this.buffer.getChannelData(0);
-    const rate = this.buffer.sampleRate;
-    const windowSize = Math.floor(rate / 2);
-    const energies = [];
-
-    for (let index = 0; index + windowSize <= samples.length; index += windowSize) {
-      let sum = 0;
-      for (let offset = 0; offset < windowSize; offset += 16) {
-        sum += samples[index + offset] ** 2;
-      }
-      energies.push(sum);
-    }
-
-    const windowsPerClip = Math.round(duration * 2);
-    let bestStart = 0;
-    let bestEnergy = -1;
-    for (let start = 0; start + windowsPerClip <= energies.length; start++) {
-      const energy = energies.slice(start, start + windowsPerClip).reduce((total, value) => total + value, 0);
-      if (energy > bestEnergy) {
-        bestEnergy = energy;
-        bestStart = start;
-      }
-    }
-
-    return bestStart / 2;
+    return loudestStart(this.buffer, duration);
   }
 
   /** The analyser node the visualizer reads from (created on first use). */
@@ -275,14 +359,13 @@ export class WarpPlayer {
   /**
    * Play the clip.
    * @param {object} options
-   * @param {string[]} options.layers   active layers, e.g. ["reversed", "static"]
-   * @param {object|number} options.intensity  0–1, or { static, warble, muffled }
+   * @param {{ type: string, value: number } | null} options.damage  null plays the clean song
    * @param {number} options.start      where the clip starts in the preview (seconds)
    * @param {number} [options.duration] clip length in song seconds
    * @param {number} [options.volume]   0–1
-   * @param {number} [options.seed]     fixes where a "chewed" tape stutters and skips
+   * @param {number} [options.seed]     fixes where Chewed and Warp strike, so replays match
    */
-  play({ layers, intensity, start, duration = CLIP_SECONDS, volume = 0.9, seed = 1 }) {
+  play({ damage = null, start, duration = CLIP_SECONDS, volume = 0.9, seed = 1 }) {
     if (!this.buffer) {
       return;
     }
@@ -291,99 +374,87 @@ export class WarpPlayer {
     this.stop();
     this.getAnalyser();
 
-    const active = new Set(layers);
-    const levelFor = (layer) => (typeof intensity === "number" ? intensity : intensity[layer] ?? 0.5);
+    const type = damage?.type ?? "clean";
     const clipStart = Math.min(start, Math.max(this.buffer.duration - duration, 0));
-
-    // The source: forwards or backwards. A reversed clip covers the same section of the song.
     const source = ctx.createBufferSource();
-    let buffer = active.has("reversed") ? this.reversedBuffer : this.buffer;
-    let offset = active.has("reversed") ? this.buffer.duration - clipStart - duration : clipStart;
-    let clipLength = duration;
+    let offset = clipStart;
 
-    // Chewed: play a damaged copy of just the clip, from its beginning.
-    if (active.has("chewed")) {
-      buffer = chewBuffer(ctx, buffer, Math.max(offset, 0), duration, settingsFor(levelFor("chewed")), seed);
+    // These three build a new buffer holding just the damaged clip, so it plays from 0.
+    if (type === "rewind") {
+      source.buffer = chopReverseBuffer(ctx, this.buffer, clipStart, duration, damage.value);
       offset = 0;
-      clipLength = buffer.duration;
+    } else if (type === "chewed") {
+      source.buffer = chewBuffer(ctx, this.buffer, clipStart, duration, damage.value, seed);
+      offset = 0;
+    } else if (type === "warp") {
+      source.buffer = crackBuffer(ctx, this.buffer, clipStart, duration, damage.value, damage.chunk ?? 0.4, seed);
+      offset = 0;
+    } else {
+      source.buffer = this.buffer;
     }
-    source.buffer = buffer;
 
-    let chainEnd = source;
-    const connect = (node) => {
-      chainEnd.connect(node);
-      chainEnd = node;
-      this.nodes.push(node);
-    };
+    // Faster playback also raises the pitch, like a real tape.
+    const speed = type === "fastforward" ? damage.value : 1;
+    source.playbackRate.value = speed;
+    const realLength = duration / speed;
 
-    if (active.has("static")) {
-      const settings = settingsFor(levelFor("static"));
+    // Everything is mixed into `mix`, then faded in and out to prevent clicks.
+    const mix = ctx.createGain();
+    let chainEnd = mix;
+    source.connect(mix);
+
+    if (type === "rickroll" && this.overlay) {
+      const rick = ctx.createBufferSource();
+      rick.buffer = this.overlay;
+      const rickLevel = ctx.createGain();
+      // damage.value is Rick's loudness compared with this song's, so quiet and loud songs match.
+      const rickStart = loudestStart(this.overlay, duration);
+      rickLevel.gain.value = damage.value * (loudness(this.buffer, clipStart, duration) / loudness(this.overlay, rickStart, duration));
+      rick.connect(rickLevel).connect(mix);
+      rick.start(ctx.currentTime, rickStart, realLength);
+      this.nodes.push(rick, rickLevel);
+    }
+
+    if (type === "muffled") {
+      const lowpass = ctx.createBiquadFilter();
+      lowpass.type = "lowpass";
+      lowpass.frequency.value = damage.value;
+      lowpass.Q.value = 0.9;
+      mix.connect(lowpass);
+
+      // The tape is crunchy too: fewer bits while the static is strong.
       const crusher = ctx.createWaveShaper();
-      crusher.curve = makeCrushCurve(settings.bits);
-      connect(crusher);
+      const staticLevel = Math.min(Math.max(damage.static ?? 0, 0), 2);
+      crusher.curve = makeCrushCurve(Math.max(12 - 9 * staticLevel, 2));
+      lowpass.connect(crusher);
+      // The static joins after the crunch, like noise on the tape itself.
+      const withStatic = ctx.createGain();
+      crusher.connect(withStatic);
+      chainEnd = withStatic;
 
+      // Static over the whole range, so it covers the tune, not just the treble.
+      // damage.static is its loudness next to this song's (1 = equally loud).
       const hiss = ctx.createBufferSource();
       hiss.buffer = makeHissBuffer(ctx);
       hiss.loop = true;
       const hissFilter = ctx.createBiquadFilter();
       hissFilter.type = "highpass";
-      hissFilter.frequency.value = 1500;
-      const hissGain = ctx.createGain();
-      hissGain.gain.value = settings.hiss;
-      hiss.connect(hissFilter).connect(hissGain).connect(crusher);
+      hissFilter.frequency.value = 120;
+      const hissLevel = ctx.createGain();
+      hissLevel.gain.value = (staticLevel * loudness(this.buffer, clipStart, duration)) / HISS_LOUDNESS;
+      hiss.connect(hissFilter).connect(hissLevel).connect(withStatic);
       hiss.start();
-      this.nodes.push(hiss, hissFilter, hissGain);
+      this.nodes.push(lowpass, crusher, withStatic, hiss, hissFilter, hissLevel);
     }
 
-    // A slow oscillator bends the pitch up and down, like a warped record.
-    const addWobble = (frequency, cents) => {
-      const wobble = ctx.createOscillator();
-      wobble.frequency.value = frequency;
-      const wobbleDepth = ctx.createGain();
-      wobbleDepth.gain.value = cents;
-      wobble.connect(wobbleDepth).connect(source.detune);
-      wobble.start();
-      this.nodes.push(wobble, wobbleDepth);
-    };
-
-    // Speed effects multiply: playing faster also raises the pitch, like a real tape.
-    let speed = 1;
-    if (active.has("fastforward")) {
-      speed *= settingsFor(levelFor("fastforward")).fastSpeed;
-    }
-    if (active.has("melted")) {
-      const settings = settingsFor(levelFor("melted"));
-      speed *= settings.meltSpeed;
-      // Two wobbles at unrelated speeds make the drift feel uneven, not like a steady siren.
-      addWobble(settings.meltHz, settings.meltCents * 0.65);
-      addWobble(settings.meltHz * 0.37, settings.meltCents * 0.35);
-    }
-    if (active.has("warble")) {
-      const settings = settingsFor(levelFor("warble"));
-      speed *= settings.speed;
-      addWobble(settings.wobbleHz, settings.wobbleCents);
-    }
-    source.playbackRate.value = speed;
-
-    if (active.has("muffled")) {
-      const settings = settingsFor(levelFor("muffled"));
-      const lowpass = ctx.createBiquadFilter();
-      lowpass.type = "lowpass";
-      lowpass.frequency.value = settings.cutoff;
-      lowpass.Q.value = 0.9;
-      connect(lowpass);
-    }
-
-    // Short fades at both ends prevent clicks.
-    const realLength = clipLength / speed;
     const envelope = ctx.createGain();
     const now = ctx.currentTime;
     envelope.gain.setValueAtTime(0, now);
     envelope.gain.linearRampToValueAtTime(volume, now + FADE_SECONDS);
     envelope.gain.setValueAtTime(volume, now + realLength - FADE_SECONDS);
     envelope.gain.linearRampToValueAtTime(0, now + realLength);
-    connect(envelope);
-    chainEnd.connect(this.output);
+    chainEnd.connect(envelope).connect(this.output);
+    this.nodes.push(mix, envelope);
 
     source.onended = () => {
       if (this.source === source) {
@@ -392,7 +463,7 @@ export class WarpPlayer {
       }
     };
 
-    source.start(now, Math.max(offset, 0), clipLength);
+    source.start(now, offset, duration);
     this.source = source;
     this.nodes.push(source);
     this.playing = true;
