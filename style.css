@@ -1465,6 +1465,9 @@ svg {
 
 .reveal {
   margin-top: 22px;
+  /* Room below the buttons when ui.js scrolls the card into view
+     (and for the anime show line that appears a moment later). */
+  scroll-margin-bottom: 40px;
   text-align: center;
   animation: screen-in 0.5s var(--ease-out);
 }

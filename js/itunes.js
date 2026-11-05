@@ -112,13 +112,15 @@ export async function searchSongs(term) {
       !JUNK_PATTERN.test(`${result.trackName} ${result.collectionName} ${result.artistName}`) &&
       searchNamesSong(typedWords, result.trackName, result.artistName)
   );
-  const artistNames = new Set(results.map((result) => splitArtists(result.artistName)[0]));
+  // An artist written only in another script (Japanese, say) cleans up to "", so default to that.
+  const firstArtist = (result) => splitArtists(result.artistName)[0] ?? "";
+  const artistNames = new Set(results.map(firstArtist));
   const seen = new Set();
   const songs = [];
 
   for (const result of results) {
     const title = normalizeTitle(result.trackName);
-    const artist = splitArtists(result.artistName)[0];
+    const artist = firstArtist(result);
 
     // Knockoffs often put the real artist in the title ("Blinding Lights The Weeknd").
     const namesOtherArtist = [...artistNames].some(

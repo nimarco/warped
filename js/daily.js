@@ -9,6 +9,7 @@ import {
   DISTORTION_ORDER,
   FALLBACK_DISTORTION,
   FREE_PLAY_SKIPS_DAILY_DAYS,
+  FREE_PLAY_TIER_SHARES,
   LAUNCH_DATE,
   RICKROLL_TRACK_ID,
   TRACKS_PER_DAY,
@@ -149,6 +150,24 @@ export function freePlaySongs(genre, decade) {
       (genre === "hits" || genre === "all" || song.genres.includes(genre)) &&
       (decade === "all" || Math.floor(song.year / 10) * 10 === Number(decade))
   );
+}
+
+/**
+ * A Free Play song's tier among the songs its filters allow, from how many of
+ * them have more Last.fm listeners (FREE_PLAY_TIER_SHARES).
+ */
+export function freePlayTier(song, genre, decade) {
+  const songs = freePlaySongs(genre, decade);
+  const ahead = songs.filter((other) => (other.listeners ?? 0) > (song.listeners ?? 0)).length;
+  const position = ahead / songs.length;
+  let reached = 0;
+  for (const [index, share] of FREE_PLAY_TIER_SHARES.entries()) {
+    reached += share;
+    if (position < reached) {
+      return index + 1;
+    }
+  }
+  return FREE_PLAY_TIER_SHARES.length;
 }
 
 let upcoming = { puzzle: null, ids: new Set() };

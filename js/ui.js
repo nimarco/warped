@@ -433,6 +433,14 @@ export function showReveal({ solved, song, points, nextLabel }) {
   link.setAttribute("aria-label", `Listen to ${song.title} on Apple Music (opens in a new tab)`);
 
   elements.nextButton.textContent = nextLabel;
+
+  // On a short window the result card ends below the fold: bring it (and the
+  // Next button) into view once the page has settled.
+  const reveal = $("reveal");
+  setTimeout(() => {
+    const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    reveal.scrollIntoView({ block: "nearest", behavior: smooth ? "smooth" : "auto" });
+  }, 50);
 }
 
 /** The anime an anime song is from, under its artist. */

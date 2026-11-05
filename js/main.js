@@ -27,6 +27,7 @@ import {
   availableDecades,
   distortionForSong,
   freePlaySongs,
+  freePlayTier,
   genreCounts,
   getDailyDistortions,
   getDailyLineup,
@@ -77,7 +78,7 @@ const app = {
   progressFrame: null,
   countdownTimer: null,
   day: loadDay(puzzleNumber) ?? { puzzle: puzzleNumber, current: 0, tracks: [], finished: false },
-  free: { genre: "hits", decade: "all", distortion: "mixed", lastIntro: null, score: 0, count: 0, played: loadFreePlayed(), poolReady: null },
+  free: { genre: "hits", decade: "all", distortion: "mixed", score: 0, count: 0, played: loadFreePlayed(), poolReady: null },
 };
 
 /* ---------- Loading a track ---------- */
@@ -236,16 +237,12 @@ function loadRickGif() {
 }
 
 /**
- * The intro card naming the track's damage. Daily shows it before every new
- * track; Free Play only when the damage differs from the last one it showed.
- * A track that already has guesses (reopened later) skips it.
+ * The intro card naming the track's damage, before every new track (click to
+ * skip). A track that already has guesses (reopened later) skips it.
  */
 async function showIntro(round, gifSearch) {
-  if (round.guesses.length > 0 || (app.mode === "free" && app.free.lastIntro === round.distortion)) {
+  if (round.guesses.length > 0) {
     return;
-  }
-  if (app.mode === "free") {
-    app.free.lastIntro = round.distortion;
   }
   const timeout = new Promise((resolve) => setTimeout(resolve, RICK_GIF_WAIT_MS, null));
   const gif = gifSearch ? await Promise.race([gifSearch, timeout]) : null;
@@ -286,7 +283,7 @@ function loadFreeTrack() {
   const notFirst = new Set([...played, first.id]);
   const backups = [pickFreePlaySong(genre, decade, notFirst), pickFreePlaySong("hits", "all", notFirst)].filter(Boolean);
   const distortion = app.free.distortion === "mixed" ? randomDistortion() : app.free.distortion;
-  startTrack([first, ...backups], first.tier, distortion);
+  startTrack([first, ...backups], freePlayTier(first, genre, decade), distortion);
 }
 
 /** Fill the genre and era filters. An era with no songs in the chosen genre goes back to "All eras". */
@@ -583,7 +580,8 @@ function showReveal(playSong) {
   if (playSong) {
     playClip({ clean: true });
   }
-  elements.nextButton.focus();
+  // ui.showReveal scrolls the card into view, smoothly.
+  elements.nextButton.focus({ preventScroll: true });
 }
 
 function next() {
