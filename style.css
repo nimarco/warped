@@ -721,11 +721,83 @@ svg {
 /* ---------- The deck (TV + controls) ---------- */
 
 .deck {
+  position: relative;
+  margin-top: 58px;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-large);
   background: linear-gradient(180deg, var(--panel), var(--bg-raised));
   box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Rabbit-ear antennas on top of the TV */
+.antenna {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  width: 70px;
+  height: 16px;
+  margin-bottom: -1px;
+  transform: translateX(-50%);
+  border: 1px solid var(--line-strong);
+  border-bottom: 0;
+  border-radius: 35px 35px 4px 4px;
+  background: linear-gradient(180deg, var(--panel-hover), var(--panel));
+}
+
+.antenna-rod {
+  --tilt: -34deg;
+  position: absolute;
+  bottom: 10px;
+  left: calc(50% - 1.5px);
+  width: 3px;
+  height: 58px;
+  transform: rotate(var(--tilt));
+  transform-origin: 50% 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #6d6577, #d8d0e0 45%, #6d6577);
+}
+
+.antenna-rod + .antenna-rod {
+  --tilt: 30deg;
+  height: 52px;
+}
+
+/* The ball on each tip */
+.antenna-rod::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: -2.5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff, #a99fb4 60%, #5a5262);
+}
+
+body.is-playing .antenna-rod {
+  animation: antenna-wiggle 1.8s ease-in-out infinite;
+}
+
+body.is-playing .antenna-rod + .antenna-rod {
+  animation-delay: -0.9s;
+}
+
+.antenna.is-twitching .antenna-rod {
+  animation: antenna-twitch 0.55s var(--ease-out);
+}
+
+@keyframes antenna-wiggle {
+  0%, 100% { transform: rotate(var(--tilt)); }
+  50% { transform: rotate(calc(var(--tilt) + 4deg)); }
+}
+
+@keyframes antenna-twitch {
+  0% { transform: rotate(var(--tilt)); }
+  25% { transform: rotate(calc(var(--tilt) - 14deg)); }
+  55% { transform: rotate(calc(var(--tilt) + 9deg)); }
+  80% { transform: rotate(calc(var(--tilt) - 3deg)); }
+  100% { transform: rotate(var(--tilt)); }
 }
 
 .tv {
@@ -2037,7 +2109,7 @@ dd {
 
   .play {
     display: grid;
-    grid-template-columns: 220px minmax(0, var(--content-width)) 300px;
+    grid-template-columns: 236px minmax(0, var(--content-width)) 290px;
     grid-template-rows: auto auto 1fr;
     grid-template-areas:
       "shelf deck side"
@@ -2048,10 +2120,12 @@ dd {
     align-items: start;
   }
 
+  /* Both side panels start level with the TV (the antennas sit above it). */
   .shelf {
     grid-area: shelf;
     position: sticky;
     top: 16px;
+    margin-top: 58px;
   }
 
   .deck { grid-area: deck; }
@@ -2060,7 +2134,7 @@ dd {
 
   .guess-side {
     grid-area: side;
-    margin-top: 0;
+    margin-top: 58px;
   }
 
   .panel-label {
@@ -2122,28 +2196,100 @@ dd {
     box-shadow: 0 0 0 1px var(--text), 0 0 24px -6px var(--damage-glow);
   }
 
-  /* The Free Play filters, stacked */
+  /* The Free Play filters as a TV remote: IR window and power LED on top,
+     the menus as little LCD readouts, a pad of buttons at the bottom. */
   .free-bar {
+    position: relative;
     flex-direction: column;
     align-items: stretch;
     gap: 14px;
     margin: 0;
+    padding: 36px 18px 84px;
+    border: 1px solid var(--line-strong);
+    border-radius: 30px 30px 44px 44px;
+    background: linear-gradient(165deg, #2c2632, #1a171e 55%, #141117);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 -14px 24px rgba(0, 0, 0, 0.35),
+      0 26px 40px -18px rgba(0, 0, 0, 0.9);
+  }
+
+  /* IR window and the power LED (it blinks while a clip plays) */
+  .free-bar::before {
+    content: "";
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    width: 64px;
+    height: 9px;
+    transform: translateX(-50%);
+    border-radius: 5px;
+    background:
+      radial-gradient(circle at calc(100% - 4px) 50%, var(--accent) 0 3px, transparent 4px),
+      linear-gradient(90deg, #2a0a14, #4d1326) no-repeat 0 0 / 70% 100%;
+  }
+
+  body.is-playing .free-bar::before {
+    animation: led-blink 1.2s step-end infinite;
+  }
+
+  /* A pad of six buttons */
+  .free-bar::after {
+    content: "";
+    position: absolute;
+    right: 26px;
+    bottom: 20px;
+    left: 26px;
+    height: 46px;
+    background: radial-gradient(circle, #342e3b 0 8px, rgba(0, 0, 0, 0.5) 9px, transparent 10px) 0 0 / 33.333% 50% repeat;
   }
 
   .free-filter {
     flex-direction: column;
     align-items: stretch;
-    gap: 6px;
+    gap: 5px;
+  }
+
+  .free-label {
+    color: var(--text-faint);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
   }
 
   .free-filter .select {
     width: 100%;
+    border-color: #2b3431;
+    border-radius: 10px;
+    background-color: #0a0d0c;
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.7);
+    color: var(--cyan);
+    padding-right: 30px;
+    padding-left: 10px;
+    font-family: var(--font-mono);
+    font-size: 17px;
+    font-weight: 400;
   }
 
+  /* The session score on the remote's display */
   .free-score {
     margin: 4px 0 0;
-    padding-top: 14px;
-    border-top: 1px solid var(--line);
+    padding: 6px 10px;
+    border: 1px solid #2b3431;
+    border-radius: 10px;
+    background: #0a0d0c;
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.7);
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 16px;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .free-score strong {
+    color: var(--correct);
+    font-weight: 400;
   }
 
   .guesses {
@@ -2156,6 +2302,10 @@ dd {
 }
 
 /* ---------- Reduced motion ---------- */
+
+@keyframes led-blink {
+  50% { opacity: 0.45; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .room-tracking {

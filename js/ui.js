@@ -299,6 +299,16 @@ export function showPicture(kind, art) {
 
 /* ---------- Controls ---------- */
 
+/** The antennas twitch, as if someone's fiddling for a better signal (after a miss). */
+export function twitchAntenna() {
+  const antenna = $("antenna");
+  antenna.classList.remove("is-twitching");
+  void antenna.offsetWidth; // restart the animation
+  antenna.classList.add("is-twitching");
+  // Then hand the antennas back to the playing wiggle.
+  antenna.addEventListener("animationend", () => antenna.classList.remove("is-twitching"), { once: true });
+}
+
 export function setPlaying(isPlaying) {
   elements.tv.classList.toggle("is-playing", isPlaying);
   document.body.classList.toggle("is-playing", isPlaying);

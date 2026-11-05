@@ -430,6 +430,7 @@ function afterTry(result) {
   }
 
   const feedback = RESULT_MESSAGES[result];
+  ui.twitchAntenna();
   if (feedback.blip) {
     playBlip(feedback.blip);
   }
