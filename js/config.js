@@ -129,7 +129,8 @@ export const FREE_PLAY_SKIPS_DAILY_DAYS = 60;
 // Free Play rates a song against the songs its filters allow, by Last.fm
 // listeners: the best-known 15% are Easy, the next 35% Medium, then 30% Hard
 // and the last 20% Expert. So the Anime filter's best-known openings are Easy
-// even though a mid-level pop song has more listeners overall.
+// even though a mid-level pop song has more listeners overall. (The Anime
+// filter ranks by `fame` in more-songs.js instead of listeners.)
 export const FREE_PLAY_TIER_SHARES = [0.15, 0.35, 0.3, 0.2];
 
 // Free Play's song filter. "hits" is Daily's song list (Billboard top 40),

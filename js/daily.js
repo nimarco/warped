@@ -154,11 +154,14 @@ export function freePlaySongs(genre, decade) {
 
 /**
  * A Free Play song's tier among the songs its filters allow, from how many of
- * them have more Last.fm listeners (FREE_PLAY_TIER_SHARES).
+ * them are better known (FREE_PLAY_TIER_SHARES). Usually that's Last.fm
+ * listeners; the Anime filter uses `fame`, which also counts the show's
+ * popularity, because Last.fm misses songs fans hear in the show.
  */
 export function freePlayTier(song, genre, decade) {
   const songs = freePlaySongs(genre, decade);
-  const ahead = songs.filter((other) => (other.listeners ?? 0) > (song.listeners ?? 0)).length;
+  const known = genre === "anime" ? (item) => item.fame ?? 0 : (item) => item.listeners ?? 0;
+  const ahead = songs.filter((other) => known(other) > known(song)).length;
   const position = ahead / songs.length;
   let reached = 0;
   for (const [index, share] of FREE_PLAY_TIER_SHARES.entries()) {
