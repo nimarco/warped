@@ -12,8 +12,9 @@ import {
   DISTORTIONS,
   FALLBACK_DISTORTION,
   FREE_PLAY_GENRES,
-  GIPHY_WAIT_MS,
   MAX_TRIES,
+  RICK_GIF,
+  RICK_GIF_WAIT_MS,
   RICKROLL_TRACK_ID,
   TIER_NAMES,
   TRACKS_PER_DAY,
@@ -34,7 +35,6 @@ import {
   randomDistortion,
 } from "./daily.js";
 import { TrackRound } from "./game.js";
-import { findRickGif } from "./giphy.js";
 import { findMusicVideo, lookupSongs, searchSongs } from "./itunes.js";
 import { drawPixelated } from "./peek.js";
 import { buildShareText, copyText } from "./share.js";
@@ -174,7 +174,7 @@ async function startTrack(candidates, tier, distortion, saved, attempt = 1) {
     }
     app.round = new TrackRound(song, tier, damage, saved);
     // Start looking for Rick's GIF now; the intro waits a moment for it.
-    const gif = damage === "rickroll" ? findRickGif() : null;
+    const gif = damage === "rickroll" ? loadRickGif() : null;
     app.clipStart = player.findLoudestStart();
     ui.setTvStatus(null);
     saveProgress();
@@ -221,6 +221,22 @@ async function startTrack(candidates, tier, distortion, saved, attempt = 1) {
   }
 }
 
+let rickGif = null;
+
+/** Download the dancing Rick once, so the intro can show him straight away. Null if it fails. */
+function loadRickGif() {
+  rickGif ??= (async () => {
+    const image = new Image();
+    image.src = RICK_GIF;
+    await image.decode();
+    return { url: RICK_GIF, alt: "Rick Astley dancing" };
+  })().catch(() => {
+    rickGif = null; // try again next time
+    return null;
+  });
+  return rickGif;
+}
+
 /**
  * The intro card naming the track's damage. Daily shows it before every new
  * track; Free Play only when the damage differs from the last one it showed.
@@ -233,7 +249,7 @@ async function showIntro(round, gifSearch) {
   if (app.mode === "free") {
     app.free.lastIntro = round.distortion;
   }
-  const timeout = new Promise((resolve) => setTimeout(resolve, GIPHY_WAIT_MS, null));
+  const timeout = new Promise((resolve) => setTimeout(resolve, RICK_GIF_WAIT_MS, null));
   const gif = gifSearch ? await Promise.race([gifSearch, timeout]) : null;
   if (app.round !== round) {
     return;

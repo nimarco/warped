@@ -167,10 +167,7 @@ export const BUSY_RETRIES = 3;
 export const CUTSCENE_MS = 2200;
 export const CUTSCENE_GIF_MS = 2800;
 
-// GIPHY finds the dancing Rick for the Rickrolled intro. Get a free key at
-// developers.giphy.com (Create an App → API). Without a key, or if GIPHY fails,
-// the intro just shows the title.
-export const GIPHY_API_KEY = "";
-export const GIPHY_QUERY = "rick astley dancing";
-// Wait this long for the GIF before starting the intro without it.
-export const GIPHY_WAIT_MS = 2500;
+// The dancing Rick in the Rickrolled intro. If it hasn't loaded after
+// RICK_GIF_WAIT_MS, the intro starts with just the title.
+export const RICK_GIF = "assets/rick-dance.gif";
+export const RICK_GIF_WAIT_MS = 2500;

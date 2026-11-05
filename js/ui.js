@@ -196,7 +196,7 @@ let cutscene = null;
 
 /**
  * Play the short intro that names a track's damage. gif: { url, alt } shows
- * the GIPHY dancer (Rickrolled). Resolves when it ends, or early when the
+ * the dancing Rick (Rickrolled). Resolves when it ends, or early when the
  * player clicks it or stopCutscene() is called.
  */
 export function playCutscene(distortion, { gif = null, duration = 2200 } = {}) {
@@ -227,7 +227,7 @@ export function playCutscene(distortion, { gif = null, duration = 2200 } = {}) {
 
   const figure = $("cutscene-gif");
   figure.hidden = !gif;
-  figure.querySelector("img")?.remove();
+  figure.replaceChildren();
   if (gif) {
     const image = document.createElement("img");
     image.src = gif.url;

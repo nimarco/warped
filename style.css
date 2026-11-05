@@ -689,7 +689,7 @@ svg {
 
 /* ---------- The damage intro ----------
    A ~2 s title card on the TV before each track (ui.js playCutscene).
-   data-damage picks the scene, .has-gif makes room for the GIPHY dancer
+   data-damage picks the scene, .has-gif makes room for the dancing Rick
    (Rickrolled), and .is-leaving switches the card off like an old TV. */
 
 .cutscene {
@@ -844,7 +844,7 @@ svg {
   100% { opacity: 1; transform: none; }
 }
 
-/* ● Rickrolled: Rick dances (GIPHY), then the title drops in below him. */
+/* ● Rickrolled: Rick dances (assets/rick-dance.gif), then the title drops in below him. */
 .cutscene[data-damage="rickroll"] .cutscene-scene {
   background: radial-gradient(circle at 50% 40%, rgba(255, 210, 63, 0.28), transparent 55%);
   animation: spotlight 0.5s ease-in-out infinite alternate;
@@ -861,28 +861,19 @@ svg {
 
 .cutscene-gif {
   position: absolute;
-  inset: 13% 0 30%;
+  inset: 8% 0 26%;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  margin: 0;
+  justify-content: center;
   animation: cut-on 0.3s steps(3);
 }
 
+/* The GIF is a cut-out sticker: a yellow glow around Rick instead of a frame. */
 .cutscene-gif img {
-  height: calc(100% - 16px);
+  height: 100%;
   width: auto;
-  max-width: 86%;
+  max-width: 90%;
   object-fit: contain;
-  border-radius: 6px;
-  box-shadow: 0 0 0 2px var(--partial), 0 0 30px rgba(255, 210, 63, 0.35);
-}
-
-.cutscene-gif figcaption {
-  color: var(--text-faint);
-  font-size: 11px;
-  line-height: 14px;
+  filter: drop-shadow(0 0 2px var(--partial)) drop-shadow(0 0 16px rgba(255, 210, 63, 0.45));
 }
 
 .cutscene.has-gif .cutscene-card {

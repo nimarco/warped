@@ -13,7 +13,7 @@ Warped is a daily song-guessing game. Every day there are four songs, from Easy 
 | 🌀 Warp | The pitch cracks up and down in chunks, like a breaking voice | The jumps get smaller |
 | 🧱 Muffled | Heard through a wall, on a crunchy tape full of static | The wall gets thinner and the static fades |
 
-Before each track, a two-second intro on the TV names its damage (Rickrolled's has a dancing Rick from GIPHY). Each day picks four of them and puts them in a new order (the same for everyone). Every wrong guess or skip eases the damage one step, and try 5 is the clean song. The sooner you name it, the more you score: 250 on try 1, down to 50 on the clean song. Stuck? **Peek** at a pixelated album cover (−25% of the track's points), then the music video (another −50%, since it usually shows the artist).
+Before each track, a two-second intro on the TV names its damage (Rickrolled's has a dancing Rick). Each day picks four of them and puts them in a new order (the same for everyone). Every wrong guess or skip eases the damage one step, and try 5 is the clean song. The sooner you name it, the more you score: 250 on try 1, down to 50 on the clean song. Stuck? **Peek** at a pixelated album cover (−25% of the track's points), then the music video (another −50%, since it usually shows the artist).
 
 After four songs you get a score out of 1000, a streak, and a spoiler-free emoji result to share. **Free Play** offers unlimited extra songs (about 11,000), filtered by genre (country, K-pop, anime, Latin…) and era.
 
@@ -22,7 +22,6 @@ After four songs you get a score out of 1000, a streak, and a spoiler-free emoji
 | API | Type | What it does in the game | Code |
 |---|---|---|---|
 | [iTunes Search API](https://performance-partners.apple.com/search-api) | Data | Song previews, album art, music video previews, and the guess autocomplete | `js/itunes.js` |
-| [GIPHY API](https://developers.giphy.com/docs/api/) | Data | The dancing Rick in the Rickrolled intro | `js/giphy.js` |
 | [Web Audio API](https://developer.mozilla.org/docs/Web/API/Web_Audio_API) | Browser | The live tape damage, chorus detection, the visualizer feed and sound effects | `js/warp.js` |
 | [Canvas API](https://developer.mozilla.org/docs/Web/API/Canvas_API) | Browser | The pixelated cover hint and the glitching TV visualizer | `js/peek.js`, `js/visualizer.js` |
 | [Web Storage API](https://developer.mozilla.org/docs/Web/API/Web_Storage_API) | Browser | Streaks, stats and resuming today's progress after a reload | `js/storage.js` |
@@ -37,7 +36,7 @@ After four songs you get a score out of 1000, a streak, and a spoiler-free emoji
 - **Storage is blocked** (private browsing): the game still works, and the stats screen explains that nothing will be saved.
 - **Clipboard is blocked:** the result appears in a text box to copy by hand.
 - **No music video exists, or it won't load:** the second peek shows the clear album cover instead.
-- **GIPHY fails or has no key:** the Rickrolled intro shows its title without the GIF. It never waits more than 2.5 seconds for it.
+- **The Rick GIF won't load:** the Rickrolled intro shows its title alone. It never waits more than 2.5 seconds for it.
 
 ## How it works
 
@@ -64,7 +63,6 @@ js/daily.js       puzzle number and today's songs
 js/matching.js    decides if a guess is right
 js/autocomplete.js  the search-as-you-type guess box
 js/ui.js          updates the page (and plays the damage intros)
-js/giphy.js       finds the GIF for the Rickrolled intro
 ```
 
 ## Running it locally
@@ -79,6 +77,6 @@ Then open http://localhost:8000.
 
 ## Credits
 
-Song previews, artwork and music videos courtesy of Apple Music via the iTunes Search API. Rick GIF powered by GIPHY. Fonts: Archivo and VT323 from Google Fonts.
+Song previews, artwork and music videos courtesy of Apple Music via the iTunes Search API. Dancing Rick sticker from GIPHY. Fonts: Archivo and VT323 from Google Fonts.
 
 Built for CSE 2004 (Website #2) with help from Claude Code (Claude Opus 5.5).
