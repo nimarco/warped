@@ -783,8 +783,11 @@ body.is-playing .antenna-rod + .antenna-rod {
   animation-delay: -0.9s;
 }
 
-.antenna.is-twitching .antenna-rod {
-  animation: antenna-twitch 0.55s var(--ease-out);
+/* Listed twice so it also beats the playing wiggle's delay on the second rod
+   (that delay made the twitch count as already over when a clip was playing). */
+.antenna.is-twitching .antenna-rod,
+.antenna.is-twitching .antenna-rod + .antenna-rod {
+  animation: antenna-twitch 0.55s var(--ease-out) 0s;
 }
 
 @keyframes antenna-wiggle {

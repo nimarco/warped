@@ -305,8 +305,14 @@ export function twitchAntenna() {
   antenna.classList.remove("is-twitching");
   void antenna.offsetWidth; // restart the animation
   antenna.classList.add("is-twitching");
-  // Then hand the antennas back to the playing wiggle.
-  antenna.addEventListener("animationend", () => antenna.classList.remove("is-twitching"), { once: true });
+  // Then hand the antennas back to the playing wiggle (only once the twitch itself ends).
+  const done = (event) => {
+    if (event.animationName === "antenna-twitch") {
+      antenna.classList.remove("is-twitching");
+      antenna.removeEventListener("animationend", done);
+    }
+  };
+  antenna.addEventListener("animationend", done);
 }
 
 export function setPlaying(isPlaying) {
