@@ -44,6 +44,12 @@
   --radius-large: 22px;
 
   --shadow: 0 18px 50px -20px rgba(0, 0, 0, 0.8);
+
+  /* The TV set: charcoal plastic, lighter than the room so the TV stands out,
+     with the screen's glass set deeper inside a bezel */
+  --tv-casing: #3a3340;
+  --tv-casing-edge: #4e4657;
+  --tv-bezel: #141118;
   --content-width: 600px;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -76,9 +82,9 @@ body {
 }
 
 /* ---------- The room ----------
-   A dark room lit by the TV: magenta and cyan light at the edges (the logo's
-   color split), the TV's glow in the current damage's color (brighter while
-   a clip plays), faint scanlines, and a slow VHS tracking band rolling down. */
+   A dark room lit only by the TV: its glow takes the current damage's color
+   (brighter while a clip plays), with faint scanlines and a slow VHS
+   tracking band rolling down. */
 
 body { --damage-color: var(--accent); --damage-glow: rgba(255, 61, 127, 0.3); }
 [data-damage="fastforward"] { --damage-color: var(--cyan); --damage-glow: rgba(61, 245, 255, 0.26); }
@@ -94,10 +100,8 @@ body { --damage-color: var(--accent); --damage-glow: rgba(255, 61, 127, 0.3); }
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
-  background:
-    radial-gradient(900px 700px at -8% 8%, rgba(255, 61, 127, 0.13), transparent 65%),
-    radial-gradient(900px 700px at 108% 92%, rgba(61, 245, 255, 0.1), transparent 65%),
-    radial-gradient(1400px 500px at 50% 120%, rgba(0, 0, 0, 0.6), transparent 70%);
+  /* The TV is the only light; the floor fades to black. */
+  background: radial-gradient(1400px 500px at 50% 120%, rgba(0, 0, 0, 0.6), transparent 70%);
 }
 
 /* Scanlines */
@@ -745,11 +749,15 @@ svg {
 .deck {
   position: relative;
   margin-top: 58px;
-  padding: 12px;
-  border: 1px solid var(--line);
+  padding: 14px;
+  border: 1px solid var(--tv-casing-edge);
   border-radius: var(--radius-large);
-  background: linear-gradient(180deg, var(--panel), var(--bg-raised));
-  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  background: var(--tv-casing);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.25),
+    0 30px 60px -24px rgba(0, 0, 0, 0.95),
+    0 2px 0 #0b090d;
 }
 
 /* Rabbit-ear antennas on top of the TV */
@@ -761,10 +769,10 @@ svg {
   height: 16px;
   margin-bottom: -1px;
   transform: translateX(-50%);
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--tv-casing-edge);
   border-bottom: 0;
   border-radius: 35px 35px 4px 4px;
-  background: linear-gradient(180deg, var(--panel-hover), var(--panel));
+  background: var(--tv-casing);
 }
 
 .antenna-rod {
@@ -830,8 +838,13 @@ body.is-playing .antenna-rod + .antenna-rod {
   overflow: hidden;
   aspect-ratio: 16 / 10;
   border-radius: var(--radius);
-  background: radial-gradient(ellipse at center, #1d1922 0%, #0a080c 75%);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 50px rgba(0, 0, 0, 0.8);
+  background: radial-gradient(ellipse at center, #17141b 0%, #050406 75%);
+  /* The glass sits inside a dark gasket and a lighter lip of the bezel */
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.7),
+    inset 0 0 50px rgba(0, 0, 0, 0.85),
+    0 0 0 4px var(--tv-bezel),
+    0 0 0 5px rgba(255, 255, 255, 0.08);
 }
 
 .tv-visualizer {
@@ -1349,7 +1362,8 @@ body.is-playing .antenna-rod + .antenna-rod {
   width: 100%;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--accent), var(--cyan));
+  /* The current damage's color, like the TV's glow */
+  background: var(--damage-color);
   transform: scaleX(0);
   transform-origin: left;
 }
@@ -1371,7 +1385,8 @@ body.is-playing .antenna-rod + .antenna-rod {
 
 .silent-tip {
   margin-top: 8px;
-  color: var(--text-faint);
+  /* On the TV's lighter casing, the faint gray would fall below 4.5:1 */
+  color: var(--text-dim);
   font-size: 13px;
   text-align: center;
 }
@@ -2226,9 +2241,7 @@ dd {
     min-height: 64px;
     padding: 10px 14px 10px 12px;
     border-left: 4px solid var(--damage-color);
-    background:
-      linear-gradient(90deg, rgba(255, 255, 255, 0.03), transparent 60%),
-      var(--bg-raised);
+    background: var(--bg-raised);
     font-size: 13px;
   }
 
