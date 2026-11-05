@@ -116,3 +116,17 @@ export function searchNamesSong(typedWords, title, artist) {
   const fitting = typedWords.filter((typed) => songWords.some((word) => wordFits(typed, word)));
   return fitting.length * 2 >= typedWords.length;
 }
+
+/**
+ * A short code for a song (title + first artist, cleaned up), so data files
+ * can say how well known a song is without spelling out its name. FNV-1a hash.
+ */
+export function songKey(title, artist) {
+  const text = `${normalizeTitle(title)}|${splitArtists(artist)[0] ?? ""}`;
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(36);
+}

@@ -38,6 +38,7 @@ After four songs you get a score out of 1000, a streak, and a spoiler-free emoji
 - **Clipboard is blocked:** the result appears in a text box to copy by hand.
 - **No music video exists, or it won't load:** the second peek shows the clear album cover instead.
 - **AniList can't be reached:** the Anime filter's guess box lists songs only, and the reveal leaves out the show's name.
+- **The song-fame file won't load:** guess suggestions keep iTunes' order.
 - **The Rick GIF won't load:** the Rickrolled intro shows its title alone. It never waits more than 2.5 seconds for it.
 
 ## How it works
@@ -48,9 +49,10 @@ After four songs you get a score out of 1000, a streak, and a spoiler-free emoji
 - **Free Play lets you pick the damage**, or mixes them at random.
 - **The clip is the chorus.** The game measures loudness across the preview and plays the loudest 10 seconds.
 - **Guesses are matched by cleaned-up title and artist,** because one song has many iTunes IDs (single, album, remaster).
+- **The hit comes first.** iTunes lists search results by how well the words match, so "Memories" used to bury Maroon 5 under a dozen unknown songs. The guess box now puts the game's songs first, best known first, using listener counts stored under a scrambled key (`data/song-fame.js`) so the file doesn't list any titles.
 - **Typing lyrics doesn't work.** iTunes also searches lyrics, so the guess box only lists songs whose title or artist matches at least half the typed words (small typos are fine). Otherwise you could type what you hear without knowing the song.
 - **The song list stores only iTunes IDs,** so reading the source doesn't spoil answers.
-- **Difficulty is how well known a song is today.** Daily's pool is every clean song from Billboard's Year-End Hot 100 top 40, 1970–2025, plus a few classics that never placed there. Each song's tier comes mostly from its Last.fm listener count, partly from that count within its genre, and a little from its year-end rank, so a 2002 hit nobody plays anymore is Hard while *Take On Me* is Easy. (A one-time script looked the counts up; the site itself never calls Last.fm.)
+- **Difficulty is how well known a song is today.** Daily's pool is every clean song from Billboard's Year-End Hot 100 top 40, 1970–2025, plus a few classics that never placed there. Each song's tier comes mostly from its Last.fm listener count, partly from that count within its genre, and a little from its year-end rank and how recent it is (most players are college students), while songs with over 2 million listeners always count as Easy, so a 2002 hit nobody plays anymore is Hard while *Take On Me* is Easy. (A one-time script looked the counts up; the site itself never calls Last.fm.)
 - **Free Play rates songs within your filter.** With the Anime filter on, a song is compared only with other anime songs, so *Unravel* is Easy there even though plenty of pop songs have more listeners. Anime songs also count as well known if they're an early opening of a popular show, because Last.fm misses songs fans mostly hear in the show (One Piece's *We Are!* has only about 5,000 listeners there).
 - **Free Play goes deeper.** Besides Daily's songs it has Billboard's genre number ones (country, R&B, rock, alternative, Latin), Korea's Circle Chart number ones, openings and endings from the 400 most popular anime on AniList, Apple's current genre charts, and Hot 100 ranks 41–100. That file only loads when Free Play opens, and Daily never uses it.
 - **Name the anime instead.** In Free Play's Anime filter you can guess the show. Any season, movie or spin-off of it counts ("Naruto" is right for a *Naruto: Shippuden* opening), because the song list stores each show's whole franchise as AniList IDs (no names, so the source doesn't spoil it).
@@ -61,6 +63,7 @@ index.html        page structure
 style.css         all styling (VHS look; colors and fonts are CSS variables)
 data/songs.js     Daily's song pool (iTunes IDs, difficulty tier, year, genres)
 data/more-songs.js extra Free Play songs, same format
+data/song-fame.js how well known each song is, for ordering guess suggestions
 js/main.js        starts the app and connects everything
 js/config.js      every tunable number (scoring, the six kinds of damage, timing)
 js/game.js        rules for one track (tries, damage level, peeks, points)

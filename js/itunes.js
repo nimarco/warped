@@ -7,7 +7,7 @@
  */
 
 import { REQUEST_TIMEOUT_MS } from "./config.js";
-import { normalizeTitle, searchNamesSong, splitArtists, toWords } from "./matching.js";
+import { normalizeTitle, searchNamesSong, songKey, splitArtists, toWords } from "./matching.js";
 
 const BASE_URL = "https://itunes.apple.com";
 
@@ -16,6 +16,14 @@ const JUNK_PATTERN =
   /karaoke|tribute|instrumental|cover|made famous|in the style of|workout|lullaby|lullapop|rockabye|kidz bop|8-bit|remix|sped up|slowed|arrangement|piano|string quartet|vitamin string|orchestra|\(live|- live|live at|live from|live in |glee cast|the voice performance|music sessions|country version|postmodern jukebox/i;
 
 const cache = new Map();
+
+// How well known each of the game's songs is (data/song-fame.js), loaded the
+// first time the guess box searches. Without it, results keep iTunes' order.
+let fame = null;
+function loadFame() {
+  fame ??= import("../data/song-fame.js").then((module) => module.SONG_FAME).catch(() => ({}));
+  return fame;
+}
 
 /** A friendly error the UI can show directly. `busy` means trying again soon should work. */
 export class ItunesError extends Error {
@@ -104,7 +112,10 @@ export async function searchSongs(term) {
     return [];
   }
 
-  const data = await getJson("search", { term: trimmed, media: "music", entity: "song", limit: 25 });
+  const [data, known] = await Promise.all([
+    getJson("search", { term: trimmed, media: "music", entity: "song", limit: 50 }),
+    loadFame(),
+  ]);
   const typedWords = toWords(trimmed);
   const results = data.results.filter(
     (result) =>
@@ -140,7 +151,13 @@ export async function searchSongs(term) {
     }
   }
 
-  return songs;
+  // iTunes orders by how well the words match, not by popularity, so "Memories"
+  // puts a dozen unknown songs before Maroon 5. Songs from the game's pools go
+  // first, best known first; the rest keep iTunes' order after them.
+  return songs
+    .map((song, index) => ({ song, index, listeners: known[songKey(song.title, song.artist)] ?? -1 }))
+    .sort((a, b) => b.listeners - a.listeners || a.index - b.index)
+    .map(({ song }) => song);
 }
 
 /** Find a music video preview for a song, or null if there isn't one. */
