@@ -78,7 +78,7 @@ const app = {
   progressFrame: null,
   countdownTimer: null,
   day: loadDay(puzzleNumber) ?? { puzzle: puzzleNumber, current: 0, tracks: [], finished: false },
-  free: { genre: "hits", decade: "all", distortion: "mixed", score: 0, count: 0, played: loadFreePlayed(), poolReady: null },
+  free: { genre: "hits", decade: "all", tier: "all", distortion: "mixed", score: 0, count: 0, played: loadFreePlayed(), poolReady: null },
 };
 
 /* ---------- Loading a track ---------- */
@@ -270,19 +270,29 @@ function loadDailyTrack() {
 }
 
 function loadFreeTrack() {
-  const { genre, decade, played } = app.free;
-  let first = pickFreePlaySong(genre, decade, played);
+  const { genre, decade, tier, played } = app.free;
+  // A narrow mix can have no songs at one difficulty: fall back to any.
+  if (tier !== "all" && freePlaySongs(genre, decade, tier).length === 0) {
+    app.free.tier = "all";
+    renderFreeFilters();
+    ui.toast(`No ${TIER_NAMES[tier]} songs in this mix. Playing any difficulty.`);
+    loadFreeTrack();
+    return;
+  }
+  let first = pickFreePlaySong(genre, decade, played, tier);
   if (!first) {
     // Every song that fits the filters has been heard: shuffle that deck again.
-    for (const song of freePlaySongs(genre, decade)) {
+    for (const song of freePlaySongs(genre, decade, tier)) {
       played.delete(song.id);
     }
     ui.toast("You've heard every song in this mix. Starting over.");
     // Don't open the new round with the song that just ended.
-    first = pickFreePlaySong(genre, decade, new Set([...played, app.round?.song.id])) ?? pickFreePlaySong(genre, decade, played);
+    first =
+      pickFreePlaySong(genre, decade, new Set([...played, app.round?.song.id]), tier) ??
+      pickFreePlaySong(genre, decade, played, tier);
   }
   const notFirst = new Set([...played, first.id]);
-  const backups = [pickFreePlaySong(genre, decade, notFirst), pickFreePlaySong("hits", "all", notFirst)].filter(Boolean);
+  const backups = [pickFreePlaySong(genre, decade, notFirst, tier), pickFreePlaySong("hits", "all", notFirst)].filter(Boolean);
   const distortion = app.free.distortion === "mixed" ? randomDistortion() : app.free.distortion;
   startTrack([first, ...backups], freePlayTier(first, genre, decade), distortion);
 }
@@ -296,6 +306,7 @@ function renderFreeFilters() {
   ui.renderGenres(genreCounts(Object.keys(FREE_PLAY_GENRES)), app.free.genre);
   ui.renderDistortionChoices(app.free.distortion);
   ui.renderDecades(decades, app.free.decade);
+  ui.renderDifficulties(app.free.tier);
 }
 
 /* ---------- Rendering the current round ---------- */
@@ -796,6 +807,11 @@ elements.distortionSelect.addEventListener("change", () => {
 
 elements.decadeSelect.addEventListener("change", () => {
   app.free.decade = elements.decadeSelect.value;
+  loadFreeTrack();
+});
+
+elements.difficultySelect.addEventListener("change", () => {
+  app.free.tier = elements.difficultySelect.value;
   loadFreeTrack();
 });
 

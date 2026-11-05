@@ -36,6 +36,7 @@ export const elements = {
   genreSelect: $("genre-select"),
   distortionSelect: $("distortion-select"),
   decadeSelect: $("decade-select"),
+  difficultySelect: $("difficulty-select"),
 
   tv: $("tv"),
   visualizer: $("visualizer"),
@@ -175,6 +176,12 @@ export function renderDistortionChoices(selected) {
 export function renderDecades(decades, selected) {
   const options = [["all", "All eras"], ...decades.map((decade) => [String(decade), `${decade}s`])];
   fillSelect(elements.decadeSelect, options, selected);
+}
+
+/** "Any", then Easy to Expert (tiers among the songs the other filters allow). */
+export function renderDifficulties(selected) {
+  const options = [["all", "Any"], ...Object.entries(TIER_NAMES)];
+  fillSelect(elements.difficultySelect, options, selected);
 }
 
 export function renderFreeScore(score, count) {

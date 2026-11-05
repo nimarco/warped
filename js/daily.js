@@ -142,27 +142,53 @@ export function animeFranchise(showId) {
   return [showId, ...(animeFranchises[showId] ?? []).filter((id) => id !== showId)];
 }
 
-/** Songs that fit Free Play's filters: a genre key from FREE_PLAY_GENRES and a decade (e.g. 1980) or "all". */
-export function freePlaySongs(genre, decade) {
+/**
+ * Songs that fit Free Play's filters: a genre key from FREE_PLAY_GENRES, a
+ * decade (e.g. 1980) or "all", and a tier (1-4) or "all".
+ */
+export function freePlaySongs(genre, decade, tier = "all") {
   const songs = genre === "hits" ? SONGS : freePlayPool ?? SONGS;
-  return songs.filter(
+  const fitting = songs.filter(
     (song) =>
       (genre === "hits" || genre === "all" || song.genres.includes(genre)) &&
       (decade === "all" || Math.floor(song.year / 10) * 10 === Number(decade))
   );
+  if (tier === "all") {
+    return fitting;
+  }
+  const tiers = tiersFor(genre, decade, fitting);
+  return fitting.filter((song) => tiers.get(song.id) === Number(tier));
 }
 
+// Each filter's tiers, worked out once: Map of song ID -> tier.
+const tierCache = new Map();
+
 /**
- * A Free Play song's tier among the songs its filters allow, from how many of
- * them are better known (FREE_PLAY_TIER_SHARES). Usually that's Last.fm
- * listeners; the Anime filter uses `fame`, which also counts the show's
- * popularity, because Last.fm misses songs fans hear in the show.
+ * Tiers among the songs a filter allows, by how many of them are better known
+ * (FREE_PLAY_TIER_SHARES: the best-known 15% are Easy, and so on). Usually
+ * that's Last.fm listeners; the Anime filter uses `fame`, which also counts the
+ * show's popularity, because Last.fm misses songs fans hear in the show.
  */
-export function freePlayTier(song, genre, decade) {
-  const songs = freePlaySongs(genre, decade);
-  const known = genre === "anime" ? (item) => item.fame ?? 0 : (item) => item.listeners ?? 0;
-  const ahead = songs.filter((other) => known(other) > known(song)).length;
-  const position = ahead / songs.length;
+function tiersFor(genre, decade, songs) {
+  const key = `${genre}|${decade}|${songs.length}`;
+  if (!tierCache.has(key)) {
+    const known = genre === "anime" ? (song) => song.fame ?? 0 : (song) => song.listeners ?? 0;
+    const sorted = [...songs].sort((a, b) => known(b) - known(a));
+    const tiers = new Map();
+    let ahead = 0;
+    sorted.forEach((song, index) => {
+      // Songs that are equally well known share a tier.
+      if (index > 0 && known(song) !== known(sorted[index - 1])) {
+        ahead = index;
+      }
+      tiers.set(song.id, tierAt(ahead / sorted.length));
+    });
+    tierCache.set(key, tiers);
+  }
+  return tierCache.get(key);
+}
+
+function tierAt(position) {
   let reached = 0;
   for (const [index, share] of FREE_PLAY_TIER_SHARES.entries()) {
     reached += share;
@@ -171,6 +197,11 @@ export function freePlayTier(song, genre, decade) {
     }
   }
   return FREE_PLAY_TIER_SHARES.length;
+}
+
+/** A Free Play song's tier among the songs its genre and era filters allow. */
+export function freePlayTier(song, genre, decade) {
+  return tiersFor(genre, decade, freePlaySongs(genre, decade)).get(song.id) ?? FREE_PLAY_TIER_SHARES.length;
 }
 
 let upcoming = { puzzle: null, ids: new Set() };
@@ -195,9 +226,9 @@ function upcomingDailyIds() {
  * like drawing from a shuffled deck. Null once every song there has been played.
  * Songs coming up in Daily are left out, unless that would leave nothing.
  */
-export function pickFreePlaySong(genre, decade, playedIds) {
+export function pickFreePlaySong(genre, decade, playedIds, tier = "all") {
   const reserved = upcomingDailyIds();
-  const songs = freePlaySongs(genre, decade);
+  const songs = freePlaySongs(genre, decade, tier);
   const unreserved = songs.filter((song) => !reserved.has(song.id));
   const fresh = (unreserved.length > 0 ? unreserved : songs).filter((song) => !playedIds.has(song.id));
   return fresh.length > 0 ? fresh[Math.floor(Math.random() * fresh.length)] : null;
