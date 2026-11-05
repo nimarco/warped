@@ -7,7 +7,7 @@
  */
 
 import { REQUEST_TIMEOUT_MS } from "./config.js";
-import { normalizeTitle, splitArtists } from "./matching.js";
+import { normalizeTitle, searchNamesSong, splitArtists, toWords } from "./matching.js";
 
 const BASE_URL = "https://itunes.apple.com";
 
@@ -97,7 +97,7 @@ export async function lookupSongs(ids) {
   return data.results.filter((item) => item.kind === "song" && item.previewUrl).map(toSong);
 }
 
-/** Search songs for the guess autocomplete, best matches first. Skips covers and duplicates. */
+/** Search songs for the guess autocomplete, best matches first. Skips covers, duplicates and songs found only by their lyrics. */
 export async function searchSongs(term) {
   const trimmed = term.trim();
   if (trimmed.length < 2) {
@@ -105,9 +105,12 @@ export async function searchSongs(term) {
   }
 
   const data = await getJson("search", { term: trimmed, media: "music", entity: "song", limit: 25 });
+  const typedWords = toWords(trimmed);
   const results = data.results.filter(
     (result) =>
-      result.kind === "song" && !JUNK_PATTERN.test(`${result.trackName} ${result.collectionName} ${result.artistName}`)
+      result.kind === "song" &&
+      !JUNK_PATTERN.test(`${result.trackName} ${result.collectionName} ${result.artistName}`) &&
+      searchNamesSong(typedWords, result.trackName, result.artistName)
   );
   const artistNames = new Set(results.map((result) => splitArtists(result.artistName)[0]));
   const seen = new Set();

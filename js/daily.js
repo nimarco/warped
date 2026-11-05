@@ -107,6 +107,7 @@ export function randomDistortion() {
 
 // Daily's songs plus data/more-songs.js, loaded the first time Free Play opens.
 let freePlayPool = null;
+let animeFranchises = {};
 
 /**
  * Load the extra Free Play songs. If that file can't load (offline, say),
@@ -118,13 +119,26 @@ export async function loadFreePlayPool() {
     return freePlayPool.length > SONGS.length;
   }
   try {
-    const { MORE_SONGS } = await import("../data/more-songs.js");
+    const { MORE_SONGS, ANIME_FRANCHISES } = await import("../data/more-songs.js");
     freePlayPool = [...SONGS, ...MORE_SONGS];
+    animeFranchises = ANIME_FRANCHISES ?? {};
     return true;
   } catch {
     freePlayPool = SONGS;
     return false;
   }
+}
+
+/**
+ * Every AniList ID that counts as naming an anime song's show: the show
+ * itself first, then its other seasons, movies and spin-offs. Null if the
+ * song isn't from an anime.
+ */
+export function animeFranchise(showId) {
+  if (!showId) {
+    return null;
+  }
+  return [showId, ...(animeFranchises[showId] ?? []).filter((id) => id !== showId)];
 }
 
 /** Songs that fit Free Play's filters: a genre key from FREE_PLAY_GENRES and a decade (e.g. 1980) or "all". */

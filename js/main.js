@@ -20,8 +20,10 @@ import {
   TRACKS_PER_DAY,
 } from "./config.js";
 import { SONGS } from "../data/songs.js";
+import { searchShows, showName } from "./anilist.js";
 import { Autocomplete } from "./autocomplete.js";
 import {
+  animeFranchise,
   availableDecades,
   distortionForSong,
   freePlaySongs,
@@ -64,7 +66,7 @@ const visualizer = new Visualizer(elements.visualizer);
 const autocomplete = new Autocomplete({
   input: elements.guessInput,
   list: elements.suggestions,
-  search: searchSongs,
+  search: searchGuesses,
 });
 
 const app = {
@@ -118,7 +120,7 @@ async function loadSong(candidates) {
     try {
       await player.load(song.previewUrl);
       // The catalog's release year is the original one; iTunes may list a later re-release.
-      return { ...song, year: entry.year, tier: entry.tier };
+      return { ...song, year: entry.year, tier: entry.tier, anime: animeFranchise(entry.anime) };
     } catch (error) {
       lastError = error;
     }
@@ -524,6 +526,22 @@ function coverFor(song, hint = false) {
   return { url: song.artworkUrl, alt };
 }
 
+/* ---------- Guess box ---------- */
+
+const SHOWS_IN_LIST = 3;
+
+/**
+ * What the guess box lists: songs from iTunes, plus anime shows from AniList
+ * when Free Play's Anime filter is on. If AniList can't be reached, songs only.
+ */
+async function searchGuesses(term) {
+  if (app.mode !== "free" || app.free.genre !== "anime") {
+    return searchSongs(term);
+  }
+  const [songs, shows] = await Promise.all([searchSongs(term), searchShows(term).catch(() => [])]);
+  return [...shows.slice(0, SHOWS_IN_LIST), ...songs];
+}
+
 /* ---------- Reveal and next ---------- */
 
 function showReveal(playSong) {
@@ -550,6 +568,15 @@ function showReveal(playSong) {
     app.free.score += round.points;
     app.free.count += 1;
     ui.renderFreeScore(app.free.score, app.free.count);
+  }
+
+  // Anime songs also name their show ("From Attack on Titan").
+  if (round.song.anime) {
+    showName(round.song.anime[0]).then((name) => {
+      if (app.round === round && name) {
+        ui.setRevealShow(name);
+      }
+    });
   }
 
   // The payoff: hear the real song.
@@ -664,6 +691,8 @@ function showDailyIntro() {
 function enterDaily() {
   app.mode = "daily";
   ui.setMode("daily");
+  ui.setGuessPlaceholder(false);
+  autocomplete.clear();
   stopClip();
   ui.stopCutscene();
   app.loadId++;
@@ -677,6 +706,8 @@ function enterDaily() {
 async function enterFreePlay() {
   app.mode = "free";
   ui.setMode("free");
+  ui.setGuessPlaceholder(app.free.genre === "anime");
+  autocomplete.clear();
   clearInterval(app.countdownTimer);
   ui.showScreen("play");
   await unlockAudio().catch(() => {});
@@ -750,6 +781,8 @@ for (const button of elements.modeButtons) {
 
 elements.genreSelect.addEventListener("change", () => {
   app.free.genre = elements.genreSelect.value;
+  ui.setGuessPlaceholder(app.free.genre === "anime");
+  autocomplete.clear();
   renderFreeFilters();
   loadFreeTrack();
 });

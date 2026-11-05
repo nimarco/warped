@@ -421,6 +421,7 @@ export function showReveal({ solved, song, points, nextLabel }) {
   eyebrow.classList.toggle("is-missed", !solved);
 
   $("reveal-title").textContent = song.title;
+  $("reveal-show").hidden = true;
   $("reveal-meta").textContent = [song.artist, song.year].filter(Boolean).join(" · ");
 
   const pointsText = $("reveal-points");
@@ -432,6 +433,18 @@ export function showReveal({ solved, song, points, nextLabel }) {
   link.setAttribute("aria-label", `Listen to ${song.title} on Apple Music (opens in a new tab)`);
 
   elements.nextButton.textContent = nextLabel;
+}
+
+/** The anime an anime song is from, under its artist. */
+export function setRevealShow(name) {
+  const line = $("reveal-show");
+  line.textContent = `From ${name}`;
+  line.hidden = false;
+}
+
+/** The guess box also takes anime names in Free Play's Anime filter. */
+export function setGuessPlaceholder(anime) {
+  elements.guessInput.placeholder = anime ? "Search a song, artist or anime…" : "Search a song or artist…";
 }
 
 export function hideReveal() {

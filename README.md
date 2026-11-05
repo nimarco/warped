@@ -22,6 +22,7 @@ After four songs you get a score out of 1000, a streak, and a spoiler-free emoji
 | API | Type | What it does in the game | Code |
 |---|---|---|---|
 | [iTunes Search API](https://performance-partners.apple.com/search-api) | Data | Song previews, album art, music video previews, and the guess autocomplete | `js/itunes.js` |
+| [AniList API](https://docs.anilist.co) | Data | In Free Play's Anime filter, the guess box also lists anime shows, so you can name the show instead of the song | `js/anilist.js` |
 | [Web Audio API](https://developer.mozilla.org/docs/Web/API/Web_Audio_API) | Browser | The live tape damage, chorus detection, the visualizer feed and sound effects | `js/warp.js` |
 | [Canvas API](https://developer.mozilla.org/docs/Web/API/Canvas_API) | Browser | The pixelated cover hint and the glitching TV visualizer | `js/peek.js`, `js/visualizer.js` |
 | [Web Storage API](https://developer.mozilla.org/docs/Web/API/Web_Storage_API) | Browser | Streaks, stats and resuming today's progress after a reload | `js/storage.js` |
@@ -36,6 +37,7 @@ After four songs you get a score out of 1000, a streak, and a spoiler-free emoji
 - **Storage is blocked** (private browsing): the game still works, and the stats screen explains that nothing will be saved.
 - **Clipboard is blocked:** the result appears in a text box to copy by hand.
 - **No music video exists, or it won't load:** the second peek shows the clear album cover instead.
+- **AniList can't be reached:** the Anime filter's guess box lists songs only, and the reveal leaves out the show's name.
 - **The Rick GIF won't load:** the Rickrolled intro shows its title alone. It never waits more than 2.5 seconds for it.
 
 ## How it works
@@ -46,9 +48,11 @@ After four songs you get a score out of 1000, a streak, and a spoiler-free emoji
 - **Free Play lets you pick the damage**, or mixes them at random.
 - **The clip is the chorus.** The game measures loudness across the preview and plays the loudest 10 seconds.
 - **Guesses are matched by cleaned-up title and artist,** because one song has many iTunes IDs (single, album, remaster).
+- **Typing lyrics doesn't work.** iTunes also searches lyrics, so the guess box only lists songs whose title or artist matches at least half the typed words (small typos are fine). Otherwise you could type what you hear without knowing the song.
 - **The song list stores only iTunes IDs,** so reading the source doesn't spoil answers.
 - **Difficulty comes from the charts.** The pool is every clean song from Billboard's Year-End Hot 100 top 40, 1970–2025, plus a few classics that never placed there. A song's tier depends on its year-end rank and how long ago it was a hit: a top-10 hit from 2000 on is Easy, a 1970s song outside the top 10 is Expert.
 - **Free Play goes deeper.** Besides Daily's songs it has Billboard's genre number ones (country, R&B, rock, alternative, Latin), Korea's Circle Chart number ones, openings and endings from the 400 most popular anime on AniList, Apple's current genre charts, and Hot 100 ranks 41–100. That file only loads when Free Play opens, and Daily never uses it.
+- **Name the anime instead.** In Free Play's Anime filter you can guess the show. Any season, movie or spin-off of it counts ("Naruto" is right for a *Naruto: Shippuden* opening), because the song list stores each show's whole franchise as AniList IDs (no names, so the source doesn't spoil it).
 - **Free Play can't spoil Daily.** It skips every song Daily will play in the next 60 days.
 
 ```
@@ -62,6 +66,7 @@ js/game.js        rules for one track (tries, damage level, peeks, points)
 js/daily.js       puzzle number and today's songs
 js/matching.js    decides if a guess is right
 js/autocomplete.js  the search-as-you-type guess box
+js/anilist.js     anime show search for the Anime filter
 js/ui.js          updates the page (and plays the damage intros)
 ```
 
@@ -77,6 +82,6 @@ Then open http://localhost:8000.
 
 ## Credits
 
-Song previews, artwork and music videos courtesy of Apple Music via the iTunes Search API. Dancing Rick sticker from GIPHY. Fonts: Archivo and VT323 from Google Fonts.
+Song previews, artwork and music videos courtesy of Apple Music via the iTunes Search API. Anime data from AniList. Dancing Rick sticker from GIPHY. Fonts: Archivo and VT323 from Google Fonts.
 
 Built for CSE 2004 (Website #2) with help from Claude Code (Claude Opus 5.5).

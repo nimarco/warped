@@ -1487,6 +1487,11 @@ svg {
   color: var(--text-dim);
 }
 
+.reveal-show {
+  margin-top: 2px;
+  color: var(--text-faint);
+}
+
 .reveal-points {
   margin-top: 14px;
   font-family: var(--font-mono);

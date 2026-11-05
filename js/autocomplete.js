@@ -1,7 +1,7 @@
 /*
  * autocomplete.js
  * The guess box. Searches iTunes as you type (after a short pause) and shows
- * a keyboard-friendly list of songs, following the ARIA combobox pattern.
+ * a keyboard-friendly list of songs (and anime shows, in Free Play's Anime filter), following the ARIA combobox pattern.
  * iTunes allows only so many searches a minute, so typing more words of the
  * same search narrows the songs it already found instead of searching again.
  */
@@ -9,9 +9,9 @@
 import { BUSY_RETRIES, BUSY_RETRY_MS, MAX_SUGGESTIONS, SEARCH_DEBOUNCE_MS } from "./config.js";
 import { toWords } from "./matching.js";
 
-/** True if every typed word is the start of a word in the song's title or artist. */
+/** True if every typed word is the start of a word in the song's title or artist (or a show's other name). */
 function matchesTyping(song, typedWords) {
-  const songWords = toWords(`${song.title} ${song.artist}`);
+  const songWords = toWords(`${song.title} ${song.artist} ${song.aliases ?? ""}`);
   return typedWords.every((typed) => songWords.some((word) => word.startsWith(typed)));
 }
 
@@ -206,6 +206,7 @@ export class Autocomplete {
     this.requestId++;
     this.input.value = "";
     this.songs = [];
+    this.found = { term: "", songs: [] };
     this.chosen = null;
     this.close();
   }

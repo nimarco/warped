@@ -5,7 +5,7 @@
  */
 
 import { DISTORTIONS, MAX_PEEKS, MAX_TRIES, PEEK_COSTS, POINTS_BY_TRY } from "./config.js";
-import { checkGuess } from "./matching.js";
+import { checkGuess, sameGuess } from "./matching.js";
 
 /** Points for solving on a given try after a number of peeks. */
 export function pointsFor(tryNumber, peeks) {
@@ -80,15 +80,16 @@ export class TrackRound {
     return !this.isOver && this.peeks < MAX_PEEKS;
   }
 
-  /** True if this song (same title and artist, any version) was already guessed. */
-  hasGuessed(song) {
-    return this.guesses.some((guess) => guess.result !== "skip" && checkGuess(song, guess) === "correct");
+  /** True if this song (same title and artist, any version) or anime show was already guessed. */
+  hasGuessed(choice) {
+    return this.guesses.some((guess) => guess.result !== "skip" && sameGuess(choice, guess));
   }
 
-  /** Make a guess. Returns "correct", "artist", "title" or "wrong". */
-  guess(song) {
-    const result = checkGuess(song, this.song);
-    this.guesses.push({ title: song.title, artist: song.artist, result });
+  /** Make a guess (a song, or an anime show). Returns "correct", "artist", "title" or "wrong". */
+  guess(choice) {
+    const result = checkGuess(choice, this.song);
+    const show = choice.show ? { show: choice.show } : {};
+    this.guesses.push({ title: choice.title, artist: choice.artist, ...show, result });
     this.updateStatus(result);
     return result;
   }
