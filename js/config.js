@@ -16,7 +16,7 @@ export const DISTORTIONS = {
     about: "too fast and too high, slowing down each try",
     // Playback speed. Higher pitch hides who's singing until it slows down.
     levels: [
-      { value: 2.5, label: "2.5×" },
+      { value: 2.3, label: "2.3×" },
       { value: 2, label: "2×" },
       { value: 1.6, label: "1.6×" },
       { value: 1.3, label: "1.3×" },
