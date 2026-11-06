@@ -42,7 +42,7 @@ export const DISTORTIONS = {
     about: "someone taped Never Gonna Give You Up over it, and it fades each try",
     // Rick's loudness compared with the song's (1 = equally loud). Labels show it as a %.
     levels: [
-      { value: 1.6, label: "160%" },
+      { value: 1.3, label: "130%" },
       { value: 1, label: "100%" },
       { value: 0.55, label: "55%" },
       { value: 0.25, label: "25%" },
