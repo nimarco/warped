@@ -97,11 +97,16 @@
             <select class="select" id="difficulty-select"></select>
           </div>
           <p class="free-score">Session <strong id="free-score">0</strong> pts · <span id="free-count">0 songs</span></p>
-          <!-- More remote hardware (decoration): a D-pad and the maker's name -->
+          <!-- The D-pad works: ▲▼ step through song mixes, ◀▶ through eras, OK plays or stops -->
+          <div class="remote-dpad">
+            <button class="dpad-up" id="dpad-up" type="button" aria-label="Previous song mix">▲</button>
+            <button class="dpad-left" id="dpad-left" type="button" aria-label="Previous era">◀</button>
+            <button class="dpad-ok" id="dpad-ok" type="button" aria-label="Play or stop the clip">OK</button>
+            <button class="dpad-right" id="dpad-right" type="button" aria-label="Next era">▶</button>
+            <button class="dpad-down" id="dpad-down" type="button" aria-label="Next song mix">▼</button>
+          </div>
+          <!-- The maker's name (decoration) -->
           <div class="remote-pad" aria-hidden="true">
-            <div class="remote-dpad">
-              <span class="dpad-up">▲</span><span class="dpad-left">◀</span><span class="dpad-ok">OK</span><span class="dpad-right">▶</span><span class="dpad-down">▼</span>
-            </div>
             <p class="remote-brand">Warped <span>VCR 2004</span></p>
           </div>
         </div>
@@ -112,6 +117,8 @@
         <div class="antenna" id="antenna" aria-hidden="true"><span class="antenna-rod"></span><span class="antenna-rod"></span></div>
         <div class="tv" id="tv">
           <canvas class="tv-visualizer" id="visualizer" aria-hidden="true"></canvas>
+          <!-- Stopped: a VCR's blue screen. The screen is the room's light (see "The room"). -->
+          <div class="tv-idle" aria-hidden="true"><p class="tv-idle-text">Press ▶ play</p></div>
           <canvas class="tv-picture" id="peek-canvas" role="img" aria-label="Pixelated album cover hint" hidden></canvas>
           <video class="tv-picture" id="peek-video" muted playsinline loop aria-label="Music video hint" hidden></video>
           <!-- The ~2 s intro before a track: names its damage (styles under "The damage intro", played by ui.js) -->
@@ -129,6 +136,12 @@
           <p class="osd osd-state" id="osd-state" aria-hidden="true">STOP ■</p>
           <p class="osd osd-track" id="osd-track" aria-hidden="true"></p>
           <p class="osd osd-time" id="osd-time" aria-hidden="true">0:00</p>
+          <p class="osd osd-points"><span aria-hidden="true">PTS</span> <span class="visually-hidden">Worth</span> <span id="worth">250</span></p>
+          <!-- How damaged the tape is, as a VCR tracking meter: each miss fixes a bar -->
+          <div class="osd osd-tracking" id="osd-tracking">
+            <p class="tracking-meter" id="tracking-meter" aria-hidden="true"></p>
+            <p class="tracking-step" id="tracking-step"></p>
+          </div>
 
           <div class="tv-status" id="tv-status" hidden>
             <p class="tv-status-text" id="tv-status-text">Loading tape…</p>
@@ -136,15 +149,12 @@
           </div>
         </div>
 
-        <ol class="layers" id="layers" aria-label="Tape damage"></ol>
-
         <div class="transport">
           <button class="play-button" id="play-button" type="button" aria-label="Play the clip" disabled>
             <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>
             <svg class="icon-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/></svg>
           </button>
           <div class="progress" aria-hidden="true"><div class="progress-fill" id="progress-fill"></div></div>
-          <p class="worth">Worth <strong id="worth">250</strong></p>
         </div>
         <p class="silent-tip" id="silent-tip" hidden>No sound? Check your phone's silent switch.</p>
       </div>
@@ -161,7 +171,7 @@
           </div>
           <div class="guess-buttons">
             <button class="button button-ghost" id="skip-button" type="button" disabled>Skip</button>
-            <button class="button button-primary" id="guess-button" type="submit" disabled>Guess</button>
+            <button class="button button-primary is-waiting" id="guess-button" type="submit" disabled>Guess</button>
           </div>
         </form>
 

@@ -82,11 +82,13 @@ body {
 }
 
 /* ---------- The room ----------
-   A dark room lit only by the TV: its glow takes the current damage's color
-   (brighter while a clip plays), with faint scanlines and a slow VHS
-   tracking band rolling down. */
+   A dark room lit only by the TV's screen: VCR blue while stopped, the
+   damage's color while a clip plays (brighter), and a slow VHS tracking band
+   rolling down. Scanlines live on the screen's glass, not the wall. */
 
-body { --damage-color: var(--accent); --damage-glow: rgba(255, 61, 127, 0.3); }
+body { --damage-color: var(--accent); --damage-glow: rgba(255, 61, 127, 0.3); --screen-glow: var(--damage-glow); }
+/* A track is loaded but stopped: the screen is VCR blue, and so is its light */
+body[data-damage]:not(.is-playing) { --screen-glow: rgba(52, 78, 255, 0.24); }
 [data-damage="fastforward"] { --damage-color: var(--cyan); --damage-glow: rgba(61, 245, 255, 0.26); }
 [data-damage="rewind"] { --damage-color: var(--accent); --damage-glow: rgba(255, 61, 127, 0.3); }
 [data-damage="rickroll"] { --damage-color: var(--partial); --damage-glow: rgba(255, 210, 63, 0.24); }
@@ -104,14 +106,6 @@ body { --damage-color: var(--accent); --damage-glow: rgba(255, 61, 127, 0.3); }
   background: radial-gradient(1400px 500px at 50% 120%, rgba(0, 0, 0, 0.6), transparent 70%);
 }
 
-/* Scanlines */
-.room::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 4px);
-}
-
 /* The TV's light on the wall behind it */
 .room-glow {
   position: absolute;
@@ -120,10 +114,12 @@ body { --damage-color: var(--accent); --damage-glow: rgba(255, 61, 127, 0.3); }
   width: min(1500px, 140vw);
   height: 900px;
   transform: translate(-50%, -50%);
-  background: radial-gradient(closest-side, var(--damage-glow), transparent);
+  background: radial-gradient(closest-side, var(--screen-glow), transparent);
   opacity: 0.6;
   transition: opacity 0.8s var(--ease-out);
 }
+
+body.is-playing { --screen-glow: var(--damage-glow); }
 
 body.is-playing .room-glow {
   opacity: 1;
@@ -465,6 +461,14 @@ svg {
   color: var(--accent-ink);
 }
 
+/* Guess waits, unlit, until there's something to guess */
+.button-primary.is-waiting {
+  border-color: var(--line-strong);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-dim);
+}
+
 .button-primary:hover:not(:disabled) {
   border-color: var(--accent-hover);
   background: var(--accent-hover);
@@ -528,45 +532,9 @@ svg {
 .chip[data-layer="muffled"] { --chip-color: #b99cff; }
 .chip[data-layer="muffled"]::before { content: "◖"; font-size: 14px; }
 
-/* The damage track: steps carry no icon; the step playing now is filled in. */
-.chip.chip-step[data-layer]::before {
-  content: none;
-}
-
-.chip-step[aria-current="step"] {
-  background: var(--chip-color);
-  color: var(--bg);
-}
-
-.chip-title {
-  border-color: transparent;
-  padding-left: 0;
-}
-
 .chip-small {
   padding: 2px 9px 2px 8px;
   font-size: 17px;
-}
-
-/* A step already eased: struck out and faded */
-.chip.is-off {
-  --chip-color: var(--text-faint);
-  border-style: dashed;
-  text-decoration: line-through;
-  text-decoration-thickness: 2px;
-}
-
-.chip.is-removing {
-  animation: chip-glitch 0.6s steps(2) both;
-}
-
-@keyframes chip-glitch {
-  0% { transform: translate(0); clip-path: inset(0); }
-  20% { transform: translate(-4px, 1px); clip-path: inset(0 0 50% 0); color: var(--accent); }
-  40% { transform: translate(5px, -1px); clip-path: inset(40% 0 0 0); color: var(--cyan); }
-  60% { transform: translate(-2px); clip-path: inset(10% 0 30% 0); }
-  80% { transform: translate(2px); clip-path: inset(0); }
-  100% { transform: none; }
 }
 
 /* ---------- Intro ---------- */
@@ -730,6 +698,7 @@ svg {
 
 /* The remote's buttons only appear on wide screens (see "Wide screens") */
 .remote-power,
+.remote-dpad,
 .remote-pad {
   display: none;
 }
@@ -757,7 +726,8 @@ svg {
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
     inset 0 -3px 0 rgba(0, 0, 0, 0.25),
     0 30px 60px -24px rgba(0, 0, 0, 0.95),
-    0 2px 0 #0b090d;
+    0 2px 0 #0b090d,
+    0 0 90px -20px var(--screen-glow);
 }
 
 /* Rabbit-ear antennas on top of the TV */
@@ -1228,6 +1198,111 @@ body.is-playing .antenna-rod + .antenna-rod {
 .osd-track { top: 14px; right: 16px; }
 .osd-time { bottom: 14px; left: 16px; }
 
+/* Points this guess is worth, under the track label */
+.osd-points {
+  top: 42px;
+  right: 16px;
+  color: var(--text-dim);
+  font-size: clamp(16px, 3.6vw, 20px);
+}
+
+.osd-points #worth {
+  color: var(--text);
+}
+
+/* The VCR tracking meter: one bar lit on try 1, all five once the song is clean */
+.osd-tracking {
+  bottom: 14px;
+  right: 16px;
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  color: var(--damage-color);
+  text-shadow: 0 0 8px var(--damage-glow);
+}
+
+.tracking-meter {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--text);
+  font-size: clamp(16px, 3.6vw, 20px);
+  text-transform: uppercase;
+}
+
+.tracking-meter .bar {
+  width: 9px;
+  height: 14px;
+  border: 1px solid currentColor;
+  opacity: 0.5;
+}
+
+.tracking-meter .bar:first-of-type {
+  margin-left: 6px;
+}
+
+.tracking-meter .bar.is-lit {
+  border-color: var(--damage-color);
+  background: var(--damage-color);
+  box-shadow: 0 0 6px var(--damage-glow);
+  opacity: 1;
+}
+
+.tracking-step {
+  font-size: clamp(15px, 3.4vw, 19px);
+  text-transform: uppercase;
+}
+
+/* On the blue stopped screen, some damage colors (Rewind's pink) are too dim
+   to read, so the text turns white; the bars keep the color. */
+.tv:not(.is-playing) .osd-tracking {
+  color: #f2f4ff;
+  text-shadow: 0 0 8px rgba(242, 244, 255, 0.4);
+}
+
+.osd-tracking.is-clean {
+  color: var(--correct);
+}
+
+.osd-tracking.is-clean .bar.is-lit {
+  border-color: var(--correct);
+  background: var(--correct);
+}
+
+/* A miss fixes a bar: the readout flickers */
+.osd-tracking.is-flashing {
+  animation: tracking-flash 0.7s steps(1) both;
+}
+
+@keyframes tracking-flash {
+  0%, 30%, 60% { opacity: 1; }
+  15%, 45% { opacity: 0.15; }
+}
+
+/* Stopped: the VCR's blue screen. Covered by any picture, intro or status. */
+.tv-idle {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(ellipse at center, #2236c9, #14208a 80%);
+}
+
+.tv.is-playing .tv-idle,
+.tv.has-status .tv-idle {
+  display: none;
+}
+
+.tv-idle-text {
+  color: #f2f4ff;
+  font-family: var(--font-mono);
+  font-size: clamp(22px, 5vw, 32px);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-shadow: 0 0 10px rgba(242, 244, 255, 0.5);
+  animation: blink 1.4s steps(2) infinite;
+}
+
 .osd-state.is-playing {
   color: var(--correct);
   text-shadow: 0 0 8px rgba(94, 240, 160, 0.5);
@@ -1267,33 +1342,9 @@ body.is-playing .antenna-rod + .antenna-rod {
   animation: blink 1.2s steps(2) infinite;
 }
 
-/* Layer chips under the screen */
-.layers {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-  margin: 14px 0 4px;
-  padding: 0;
-  list-style: none;
-}
-
-.layers .chip {
-  font-size: 17px;
-  padding: 3px 10px 3px 9px;
-}
-
-.layers .is-clean {
-  --chip-color: var(--correct);
-}
-
-.layers .is-clean::before {
-  content: "✓";
-}
-
 .transport {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   align-items: center;
   gap: 14px;
   margin-top: 10px;
@@ -2136,20 +2187,6 @@ dd {
     gap: 10px;
   }
 
-  .layers {
-    gap: 4px;
-  }
-
-  .layers .chip {
-    gap: 4px;
-    padding: 2px 7px 2px 6px;
-    font-size: 15px;
-  }
-
-  .layers .chip::before {
-    font-size: 10px;
-  }
-
   .track-step {
     padding: 6px 8px;
     font-size: 10px;
@@ -2411,6 +2448,7 @@ dd {
 
   .remote-dpad {
     display: grid;
+    align-self: center;
     grid-template-columns: repeat(3, 20px);
     grid-template-rows: repeat(3, 20px);
     place-items: center;
@@ -2424,15 +2462,34 @@ dd {
     font-size: 10px;
   }
 
+  .remote-dpad button {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    font-size: 10px;
+  }
+
+  .remote-dpad button:hover {
+    color: var(--text);
+  }
+
+  .remote-dpad button:active {
+    transform: translateY(1px);
+  }
+
   .dpad-up { grid-area: 1 / 2; }
   .dpad-left { grid-area: 2 / 1; }
   .dpad-right { grid-area: 2 / 3; }
   .dpad-down { grid-area: 3 / 2; }
 
-  .dpad-ok {
+  .remote-dpad .dpad-ok {
     grid-area: 2 / 2;
-    display: grid;
-    place-items: center;
     width: 24px;
     height: 24px;
     border-radius: 50%;

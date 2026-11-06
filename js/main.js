@@ -153,6 +153,7 @@ async function startTrack(candidates, tier, distortion, saved, attempt = 1) {
   const loadId = ++app.loadId;
   stopClip();
   autocomplete.clear();
+  updateGuessReady();
   ui.hideReveal();
   ui.showPicture("visualizer");
   ui.setPlayEnabled(false);
@@ -408,6 +409,7 @@ async function submitGuess(event) {
 
   const result = round.guess(song);
   autocomplete.clear();
+  updateGuessReady();
   afterTry(result);
 }
 
@@ -418,6 +420,7 @@ function skip() {
   }
   round.skip();
   autocomplete.clear();
+  updateGuessReady();
   afterTry("skip");
 }
 
@@ -706,6 +709,7 @@ function enterDaily() {
   ui.setMode("daily");
   ui.setGuessPlaceholder(false);
   autocomplete.clear();
+  updateGuessReady();
   stopClip();
   ui.stopCutscene();
   app.loadId++;
@@ -721,6 +725,7 @@ async function enterFreePlay() {
   ui.setMode("free");
   ui.setGuessPlaceholder(app.free.genre === "anime");
   autocomplete.clear();
+  updateGuessReady();
   clearInterval(app.countdownTimer);
   ui.showScreen("play");
   await unlockAudio().catch(() => {});
@@ -796,6 +801,7 @@ elements.genreSelect.addEventListener("change", () => {
   app.free.genre = elements.genreSelect.value;
   ui.setGuessPlaceholder(app.free.genre === "anime");
   autocomplete.clear();
+  updateGuessReady();
   renderFreeFilters();
   loadFreeTrack();
 });
@@ -809,6 +815,27 @@ elements.decadeSelect.addEventListener("change", () => {
   app.free.decade = elements.decadeSelect.value;
   loadFreeTrack();
 });
+
+/* ---------- The remote's D-pad (Free Play, wide screens) ---------- */
+
+/** Step a <select> to its previous or next option, wrapping around, as if the player picked it. */
+function stepSelect(select, direction) {
+  const count = select.options.length;
+  select.selectedIndex = (select.selectedIndex + direction + count) % count;
+  select.dispatchEvent(new Event("change"));
+}
+
+elements.dpad.up.addEventListener("click", () => stepSelect(elements.genreSelect, -1));
+elements.dpad.down.addEventListener("click", () => stepSelect(elements.genreSelect, 1));
+elements.dpad.left.addEventListener("click", () => stepSelect(elements.decadeSelect, -1));
+elements.dpad.right.addEventListener("click", () => stepSelect(elements.decadeSelect, 1));
+elements.dpad.ok.addEventListener("click", togglePlay);
+
+// Guess stays dim until there's something to guess, so Play is the one lit button.
+function updateGuessReady() {
+  elements.guessButton.classList.toggle("is-waiting", elements.guessInput.value.trim().length < 2);
+}
+elements.guessInput.addEventListener("input", updateGuessReady);
 
 elements.difficultySelect.addEventListener("change", () => {
   app.free.tier = elements.difficultySelect.value;

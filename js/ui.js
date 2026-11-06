@@ -51,6 +51,13 @@ export const elements = {
   suggestions: $("suggestions"),
   skipButton: $("skip-button"),
   guessButton: $("guess-button"),
+  dpad: {
+    up: $("dpad-up"),
+    down: $("dpad-down"),
+    left: $("dpad-left"),
+    right: $("dpad-right"),
+    ok: $("dpad-ok"),
+  },
   peekArtButton: $("peek-art-button"),
   peekVideoButton: $("peek-video-button"),
 
@@ -220,9 +227,11 @@ export function setTvStatus(status) {
   const panel = $("tv-status");
   if (!status) {
     panel.hidden = true;
+    elements.tv.classList.remove("has-status");
     return;
   }
   panel.hidden = false;
+  elements.tv.classList.add("has-status");
   panel.classList.toggle("is-loading", Boolean(status.loading));
   $("tv-status-text").textContent = status.text;
   elements.retryButton.hidden = !status.retry;
@@ -357,45 +366,34 @@ export function setWorth(points) {
 }
 
 /**
- * The damage track: the distortion's name, then its four steps, with the
- * steps already eased crossed out. level: the current step (0–3), or null when clean.
+ * The damage as a VCR tracking meter on the screen: one bar lit on try 1, one
+ * more for every miss, all five once the song is clean. Below it, the damage
+ * and its current step ("REWIND · 1 S CHOPS"), flashing when a miss eases it.
+ * level: the current step (0–3), or null when clean.
  */
 export function renderDamage(distortion, level, eased = false) {
   const { name, levels } = DISTORTIONS[distortion];
-  const title = document.createElement("li");
-  title.className = "chip chip-title";
-  title.dataset.layer = distortion;
-  title.textContent = name;
-
-  const current = level ?? levels.length;
-  const steps = levels.map((step, index) => {
-    const chip = document.createElement("li");
-    chip.className = "chip chip-step";
-    chip.dataset.layer = distortion;
-    chip.textContent = step.label;
-    if (index < current) {
-      chip.classList.add("is-off");
-      chip.setAttribute("aria-label", `${step.label} (eased)`);
-    }
-    if (eased && index === current - 1) {
-      chip.classList.add("is-removing");
-    }
-    if (index === current) {
-      chip.setAttribute("aria-current", "step");
-    }
-    return chip;
+  const bars = levels.length + 1;
+  const lit = level === null ? bars : level + 1;
+  const meter = $("tracking-meter");
+  const cells = Array.from({ length: bars }, (_, index) => {
+    const cell = document.createElement("span");
+    cell.className = index < lit ? "bar is-lit" : "bar";
+    return cell;
   });
+  meter.replaceChildren("Tracking ", ...cells);
 
-  // Try 5 is always the clean song, so "Clean" only appears once it's reached.
-  if (level === null) {
-    const clean = document.createElement("li");
-    clean.className = "chip is-clean";
-    clean.textContent = "Clean";
-    steps.push(clean);
+  const step = $("tracking-step");
+  step.textContent = `${name} · ${level === null ? "Clean" : levels[level].label}`;
+
+  const panel = $("osd-tracking");
+  panel.dataset.damage = distortion;
+  panel.classList.toggle("is-clean", level === null);
+  panel.classList.remove("is-flashing");
+  if (eased) {
+    void panel.offsetWidth; // restart the flash
+    panel.classList.add("is-flashing");
   }
-
-  $("layers").setAttribute("aria-label", `${name}: ${level === null ? "clean" : levels[level].label}`);
-  $("layers").replaceChildren(title, ...steps);
 }
 
 /** tone: "wrong" | "partial" | "info" | "" */
@@ -464,6 +462,8 @@ export function renderPeeks(peeks, canPeek) {
   elements.peekArtButton.classList.toggle("is-used", artUsed);
   elements.peekVideoButton.disabled = !artUsed || videoUsed || !canPeek;
   elements.peekVideoButton.classList.toggle("is-used", videoUsed);
+  // Until the cover's been peeked, say why the video is locked.
+  elements.peekVideoButton.querySelector(".peek-cost").textContent = artUsed ? "−50%" : "after the cover";
 }
 
 /* ---------- Reveal ---------- */
