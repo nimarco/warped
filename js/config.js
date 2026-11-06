@@ -110,9 +110,9 @@ export const CLIP_SECONDS = 10;
 
 // Every clip plays at this loudness (RMS, 0–1), whatever the song's mastering:
 // the loudest 10 s of iTunes previews measured 0.07–0.48 (2026-11-05), with
-// 2000s+ hits at 0.33–0.48, about 8 dB louder than this, and 1970s–90s ones near it.
+// 2000s+ hits at 0.33–0.48. 0.15 was still too loud (user, 2026-11-05), so 30% lower.
 // Added static or Rick count toward it, so damaged clips aren't louder either.
-export const CLIP_LOUDNESS = 0.15;
+export const CLIP_LOUDNESS = 0.105;
 // A quiet song is raised at most this much (more would mostly raise its hiss).
 export const MAX_CLIP_BOOST = 2;
 

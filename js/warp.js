@@ -346,9 +346,9 @@ export class WarpPlayer {
       this.analyser = ctx.createAnalyser();
       this.analyser.fftSize = 1024;
       this.analyser.smoothingTimeConstant = 0.75;
-      // Clips play quieter since loudness was evened out, so the bars read 6 dB lower.
-      this.analyser.minDecibels = -106;
-      this.analyser.maxDecibels = -36;
+      // Clips play quieter since loudness was evened out, so the bars read 9 dB lower.
+      this.analyser.minDecibels = -109;
+      this.analyser.maxDecibels = -39;
       this.output.connect(this.analyser);
       this.analyser.connect(ctx.destination);
     }
