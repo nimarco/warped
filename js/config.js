@@ -108,6 +108,14 @@ export const TIER_NAMES = {
 // Audio clip length in seconds of song time.
 export const CLIP_SECONDS = 10;
 
+// Every clip plays at this loudness (RMS, 0–1), whatever the song's mastering:
+// the loudest 10 s of iTunes previews measured 0.07–0.48 (2026-11-05), with
+// 2000s+ hits at 0.33–0.48, about 8 dB louder than this, and 1970s–90s ones near it.
+// Added static or Rick count toward it, so damaged clips aren't louder either.
+export const CLIP_LOUDNESS = 0.15;
+// A quiet song is raised at most this much (more would mostly raise its hiss).
+export const MAX_CLIP_BOOST = 2;
+
 // Points for a correct guess on try 1, 2, 3, 4, 5.
 export const POINTS_BY_TRY = [250, 200, 150, 100, 50];
 

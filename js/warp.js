@@ -18,11 +18,12 @@
  *   muffled      heard through a wall on a crackly, crunchy tape (value: low-pass
  *                cutoff in Hz; static: how loud the static is next to the song)
  *
- * The signal path is: song (+ Rick) → [low-pass → bitcrusher, + static] → fade in/out → analyser → speakers.
+ * The signal path is: song (+ Rick) → [low-pass → bitcrusher, + static] → level + fade in/out → analyser → speakers.
+ * Every clip is evened out to the same loudness (CLIP_LOUDNESS in config.js).
  * Nothing is pre-rendered: every play builds the chain fresh.
  */
 
-import { CLIP_SECONDS } from "./config.js";
+import { CLIP_LOUDNESS, CLIP_SECONDS, MAX_CLIP_BOOST } from "./config.js";
 
 const FADE_SECONDS = 0.04;
 
@@ -345,6 +346,9 @@ export class WarpPlayer {
       this.analyser = ctx.createAnalyser();
       this.analyser.fftSize = 1024;
       this.analyser.smoothingTimeConstant = 0.75;
+      // Clips play quieter since loudness was evened out, so the bars read 6 dB lower.
+      this.analyser.minDecibels = -106;
+      this.analyser.maxDecibels = -36;
       this.output.connect(this.analyser);
       this.analyser.connect(ctx.destination);
     }
@@ -357,10 +361,10 @@ export class WarpPlayer {
    * @param {{ type: string, value: number } | null} options.damage  null plays the clean song
    * @param {number} options.start      where the clip starts in the preview (seconds)
    * @param {number} [options.duration] clip length in song seconds
-   * @param {number} [options.volume]   0–1
+   * @param {number} [options.volume]   0–1, on top of the clip's evened-out loudness
    * @param {number} [options.seed]     fixes where Chewed and Warp strike, so replays match
    */
-  play({ damage = null, start, duration = CLIP_SECONDS, volume = 0.9, seed = 1 }) {
+  play({ damage = null, start, duration = CLIP_SECONDS, volume = 1, seed = 1 }) {
     if (!this.buffer) {
       return;
     }
@@ -442,11 +446,17 @@ export class WarpPlayer {
       this.nodes.push(lowpass, crusher, withStatic, hiss, hissFilter, hissLevel);
     }
 
+    // Even out loudness: every clip, with its added Rick or static, plays at
+    // CLIP_LOUDNESS. Those layers add energy roughly as the sum of squares.
+    const songLevel = loudness(this.buffer, clipStart, duration);
+    const added = type === "rickroll" && this.overlay ? damage.value : type === "muffled" ? Math.min(Math.max(damage.static ?? 0, 0), 2) : 0;
+    const level = volume * Math.min(CLIP_LOUDNESS / (songLevel * Math.sqrt(1 + added ** 2)), MAX_CLIP_BOOST);
+
     const envelope = ctx.createGain();
     const now = ctx.currentTime;
     envelope.gain.setValueAtTime(0, now);
-    envelope.gain.linearRampToValueAtTime(volume, now + FADE_SECONDS);
-    envelope.gain.setValueAtTime(volume, now + realLength - FADE_SECONDS);
+    envelope.gain.linearRampToValueAtTime(level, now + FADE_SECONDS);
+    envelope.gain.setValueAtTime(level, now + realLength - FADE_SECONDS);
     envelope.gain.linearRampToValueAtTime(0, now + realLength);
     chainEnd.connect(envelope).connect(this.output);
     this.nodes.push(mix, envelope);
