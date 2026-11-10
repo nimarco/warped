@@ -117,10 +117,13 @@
         <div class="antenna" id="antenna" aria-hidden="true"><span class="antenna-rod"></span><span class="antenna-rod"></span></div>
         <div class="tv" id="tv">
           <canvas class="tv-visualizer" id="visualizer" aria-hidden="true"></canvas>
-          <!-- Stopped: a VCR's blue screen. The screen is the room's light (see "The room"). -->
+          <!-- Stopped: dark glass with faint snow. The screen is the room's light (see "The room"). -->
           <div class="tv-idle" aria-hidden="true"><p class="tv-idle-text">Press ▶ play</p></div>
-          <canvas class="tv-picture" id="peek-canvas" role="img" aria-label="Pixelated album cover hint" hidden></canvas>
-          <video class="tv-picture" id="peek-video" muted playsinline loop aria-label="Music video hint" hidden></video>
+          <!-- Peek hints, shown like closed captions: the title's first letter, then the artist -->
+          <div class="tv-captions" id="tv-captions" hidden>
+            <p class="caption" id="caption-title" hidden></p>
+            <p class="caption" id="caption-artist" hidden></p>
+          </div>
           <!-- The ~2 s intro before a track: names its damage (styles under "The damage intro", played by ui.js) -->
           <div class="cutscene" id="cutscene" hidden>
             <div class="cutscene-scene" aria-hidden="true"></div>
@@ -131,6 +134,8 @@
               <p class="cutscene-about" id="cutscene-about"></p>
             </div>
           </div>
+          <!-- A tracking tear that rolls through while the clip is warped -->
+          <div class="tv-tear" aria-hidden="true"></div>
           <div class="tv-glass" aria-hidden="true"></div>
 
           <p class="osd osd-state" id="osd-state" aria-hidden="true">STOP ■</p>
@@ -138,10 +143,7 @@
           <p class="osd osd-time" id="osd-time" aria-hidden="true">0:00</p>
           <p class="osd osd-points"><span aria-hidden="true">PTS</span> <span class="visually-hidden">Worth</span> <span id="worth">250</span></p>
           <!-- How damaged the tape is, as a VCR tracking meter: each miss fixes a bar -->
-          <div class="osd osd-tracking" id="osd-tracking">
-            <p class="tracking-meter" id="tracking-meter" aria-hidden="true"></p>
-            <p class="tracking-step" id="tracking-step"></p>
-          </div>
+          <div class="osd osd-tracking" id="osd-tracking"><p class="tracking-meter" id="tracking-meter" aria-hidden="true"></p><p class="visually-hidden" id="tracking-label"></p></div>
 
           <div class="tv-status" id="tv-status" hidden>
             <p class="tv-status-text" id="tv-status-text">Loading tape…</p>
@@ -186,13 +188,13 @@
         <div class="peeks">
           <p class="peeks-label">Stuck? Peek <span>(lowers this track's points)</span></p>
           <div class="peeks-buttons">
-            <button class="button button-peek" id="peek-art-button" type="button">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12h16M12 4v16"/></svg>
-              Blurry cover <span class="peek-cost">−25%</span>
+            <button class="button button-peek" id="peek-title-button" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h10M12 5v9M4 19h3M10.5 19h3M17 19h3"/></svg>
+              First letter <span class="peek-cost">−25%</span>
             </button>
-            <button class="button button-peek" id="peek-video-button" type="button" disabled>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg>
-              Music video <span class="peek-cost">−50%</span>
+            <button class="button button-peek" id="peek-artist-button" type="button" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+              Artist <span class="peek-cost">−50%</span>
             </button>
           </div>
         </div>
@@ -271,7 +273,10 @@
         </span>
       </li>
       <li>
-        <strong>Score.</strong> 250 points on try 1, then 200, 150, 100 and 50 on the clean song. Stuck? Peeking at the blurry cover costs 25% of the track's points, and the music video another 50%.
+        <strong>Close in.</strong> Don't know it? Guess anyway. Every wrong song tells you whether the answer came out before or after it, and whether it's the same genre.
+      </li>
+      <li>
+        <strong>Score.</strong> 250 points on try 1, then 200, 150, 100 and 50 on the clean song. Stuck? Peeking at the title's first letter costs 25% of the track's points, and the artist's name another 50%.
       </li>
     </ol>
     <p class="help-legend">

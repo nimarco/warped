@@ -118,6 +118,24 @@ export function searchNamesSong(typedWords, title, artist) {
 }
 
 /**
+ * True if what's typed names part of the song's title, not just its artist:
+ * a typed word of 3+ letters that fits a word of the title but none of the
+ * artist's. A one- or two-letter start (like the title hint's first letter)
+ * doesn't count.
+ */
+export function namesTitle(typedWords, title, artist) {
+  // Without "(feat. The Weeknd)", which names an artist, not the song.
+  const titleWords = toWords(normalizeTitle(title));
+  const artistWords = toWords(artist);
+  return typedWords.some(
+    (typed) =>
+      typed.length >= 3 &&
+      titleWords.some((word) => wordFits(typed, word)) &&
+      !artistWords.some((word) => wordFits(typed, word))
+  );
+}
+
+/**
  * A short code for a song (title + first artist, cleaned up), so data files
  * can say how well known a song is without spelling out its name. FNV-1a hash.
  */

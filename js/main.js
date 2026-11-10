@@ -38,8 +38,7 @@ import {
   randomDistortion,
 } from "./daily.js";
 import { TrackRound } from "./game.js";
-import { findMusicVideo, lookupSongs, searchSongs } from "./itunes.js";
-import { drawPixelated } from "./peek.js";
+import { lookupSongs, searchSongs } from "./itunes.js";
 import { buildShareText, copyText } from "./share.js";
 import {
   displayedStreak,
@@ -193,9 +192,6 @@ async function startTrack(candidates, tier, distortion, saved, attempt = 1) {
     if (app.round.isOver) {
       showReveal(false);
     } else {
-      if (app.round.peeks > 0) {
-        restorePeek();
-      }
       await showIntro(app.round, gif);
       if (loadId !== app.loadId) {
         return;
@@ -316,7 +312,7 @@ function renderRound(eased = false, animateLast = false) {
   const round = app.round;
   ui.renderDamage(round.distortion, round.level, eased);
   ui.renderGuesses(round.guesses, animateLast);
-  ui.renderPeeks(round.peeks, round.canPeek);
+  ui.renderPeeks(round.peeks, round.canPeek, round.isOver ? {} : round.hints);
   ui.setWorth(round.isOver ? round.points : round.potentialPoints);
   visualizer.setDistortion(round.stepsLeft);
 }
@@ -431,6 +427,7 @@ function afterTry(result) {
 
   if (result === "correct") {
     playBlip("correct");
+    ui.glitchScreen();
     renderRound(null, true);
     showReveal(true);
     return;
@@ -438,6 +435,7 @@ function afterTry(result) {
 
   if (round.isOver) {
     playBlip("wrong");
+    ui.glitchScreen();
     renderRound(null, true);
     showReveal(true);
     return;
@@ -445,6 +443,7 @@ function afterTry(result) {
 
   const feedback = RESULT_MESSAGES[result];
   ui.twitchAntenna();
+  ui.glitchScreen();
   if (feedback.blip) {
     playBlip(feedback.blip);
   }
@@ -453,7 +452,8 @@ function afterTry(result) {
   const unwarp = round.level === null
     ? "Last try: this is the real song."
     : `${distortion.name} eased to ${distortion.levels[round.level].label}. ${triesLeft} tries left.`;
-  ui.setMessage(`${feedback.text} ${unwarp}`, feedback.tone);
+  const clues = ui.describeClues(round.guesses.at(-1).clues);
+  ui.setMessage([feedback.text, clues, unwarp].filter(Boolean).join(" "), feedback.tone);
   renderRound(true, true);
 
   // Play the slightly clearer version after a short beat.
@@ -466,77 +466,34 @@ function afterTry(result) {
 
 /* ---------- Peeks ---------- */
 
-async function peekArt() {
+function peekTitle() {
+  if (app.round?.peeks === 0) {
+    usePeek();
+  }
+}
+
+function peekArtist() {
+  if (app.round?.peeks === 1) {
+    usePeek();
+  }
+}
+
+/** Show the next hint on the TV: the title's first letter, then the artist. */
+function usePeek() {
   const round = app.round;
-  if (!round?.canPeek || round.peeks >= 1) {
+  if (!round?.canPeek) {
     return;
   }
-  round.peek();
+  const peek = round.peek();
   saveProgress();
   renderRound();
-  await showPixelatedCover(round);
+  const { title, artist } = round.hints;
+  ui.setMessage(peek === 1 ? ui.describeTitleHint(title) : `It's by ${artist}.`, "info");
 }
 
-async function showPixelatedCover(round) {
-  try {
-    await drawPixelated(elements.peekCanvas, round.song.artworkUrl);
-    if (app.round === round && !round.isOver) {
-      ui.showPicture("peek");
-    }
-  } catch (error) {
-    ui.toast(error.message);
-  }
-}
-
-async function peekVideo() {
-  const round = app.round;
-  if (!round?.canPeek || round.peeks !== 1) {
-    return;
-  }
-  round.peek();
-  saveProgress();
-  renderRound();
-  await showVideoOrCover(round);
-}
-
-async function showVideoOrCover(round) {
-  ui.setTvStatus({ text: "Finding the video…", loading: true });
-  let videoUrl = null;
-  let fallbackMessage = "No music video for this one. Here's the clear cover instead.";
-  try {
-    videoUrl = await findMusicVideo(round.song.title, round.song.artist);
-  } catch {
-    fallbackMessage = "Couldn't load the video right now. Here's the clear cover instead.";
-  }
-  ui.setTvStatus(null);
-  if (app.round !== round || round.isOver) {
-    return;
-  }
-
-  if (videoUrl) {
-    elements.peekVideo.src = videoUrl;
-    ui.showPicture("video");
-    elements.peekVideo.play().catch(() => ui.showPicture("art", coverFor(round.song, true)));
-  } else {
-    ui.toast(fallbackMessage);
-    ui.showPicture("art", coverFor(round.song, true));
-  }
-}
-
-/** After a reload, show whichever peek was already used. */
-function restorePeek() {
-  const round = app.round;
-  if (round.peeks >= 2) {
-    showVideoOrCover(round);
-  } else {
-    showPixelatedCover(round);
-  }
-}
-
-function coverFor(song, hint = false) {
-  // While the track is unsolved, the alt text must not give the answer away.
-  const alt = hint ? "Album cover hint" : `Album cover for ${song.title} by ${song.artist}`;
-  return { url: song.artworkUrl, alt };
+/** The album cover, shown only once the track is over, so its alt text can name the song. */
+function coverFor(song) {
+  return { url: song.artworkUrl, alt: `Album cover for ${song.title} by ${song.artist}` };
 }
 
 /* ---------- Guess box ---------- */
@@ -775,8 +732,8 @@ elements.startButton.addEventListener("click", startDaily);
 elements.playButton.addEventListener("click", togglePlay);
 elements.guessForm.addEventListener("submit", submitGuess);
 elements.skipButton.addEventListener("click", skip);
-elements.peekArtButton.addEventListener("click", peekArt);
-elements.peekVideoButton.addEventListener("click", peekVideo);
+elements.peekTitleButton.addEventListener("click", peekTitle);
+elements.peekArtistButton.addEventListener("click", peekArtist);
 elements.nextButton.addEventListener("click", next);
 elements.retryButton.addEventListener("click", retry);
 elements.shareButton.addEventListener("click", share);

@@ -4,7 +4,15 @@
  * Pure logic with no page code, so it's easy to read and test.
  */
 
-import { DISTORTIONS, MAX_PEEKS, MAX_TRIES, PEEK_COSTS, POINTS_BY_TRY } from "./config.js";
+import {
+  CLUE_CLOSE_YEARS,
+  DISTORTIONS,
+  GENRE_FAMILIES,
+  MAX_PEEKS,
+  MAX_TRIES,
+  PEEK_COSTS,
+  POINTS_BY_TRY,
+} from "./config.js";
 import { checkGuess, sameGuess } from "./matching.js";
 
 /** Points for solving on a given try after a number of peeks. */
@@ -12,6 +20,72 @@ export function pointsFor(tryNumber, peeks) {
   const base = POINTS_BY_TRY[tryNumber - 1] ?? 0;
   const peekCost = PEEK_COSTS.slice(0, peeks).reduce((total, cost) => total + cost, 0);
   return Math.round(base * (1 - peekCost));
+}
+
+/** The broad kind of music an iTunes genre name belongs to ("Alternative" → "Rock"). */
+export function genreFamily(genre) {
+  if (!genre) {
+    return null;
+  }
+  return GENRE_FAMILIES.find((family) => family.pattern.test(genre))?.name ?? genre;
+}
+
+/**
+ * What a wrong guess tells the player about the answer. Either part is left
+ * out when a year or genre isn't known.
+ * @returns {{ year?: number, when?: "same" | "before" | "after", close?: boolean, genre?: string, sameGenre?: boolean }}
+ *   when: the answer came out the same year as the guess, before it or after it
+ */
+export function cluesFor(guess, answer) {
+  const clues = {};
+  if (guess.year && answer.year) {
+    const gap = answer.year - guess.year;
+    clues.year = guess.year;
+    clues.when = gap === 0 ? "same" : gap < 0 ? "before" : "after";
+    clues.close = gap !== 0 && Math.abs(gap) <= CLUE_CLOSE_YEARS;
+  }
+  const guessGenre = genreFamily(guess.genre);
+  const answerGenre = genreFamily(answer.genre);
+  if (guessGenre && answerGenre) {
+    clues.genre = guessGenre;
+    clues.sameGenre = guessGenre === answerGenre;
+  }
+  return clues;
+}
+
+/** A title without "(Remastered 2011)", "- Single Version" or "feat. X", keeping its letters' case. */
+export function cleanTitle(title) {
+  const cleaned = title
+    .replace(/\s*[([].*?[)\]]/g, "")
+    .replace(/ - .*$/, "")
+    .replace(/\s+(feat|ft)\..*$/i, "")
+    .trim();
+  return cleaned || title;
+}
+
+/**
+ * The first peek: the title's first letter, and a blank for every other
+ * letter, word by word, so you can count them.
+ * "Billie Jean" → ["B_____", "____"], "1999" → ["1___"]. Punctuation stays visible.
+ */
+export function titleHint(title) {
+  let shown = false;
+  return cleanTitle(title)
+    .split(/\s+/)
+    .map((word) =>
+      [...word]
+        .map((char) => {
+          if (!/[\p{L}\p{N}]/u.test(char)) {
+            return char;
+          }
+          if (shown) {
+            return "_";
+          }
+          shown = true;
+          return char.toUpperCase();
+        })
+        .join("")
+    );
 }
 
 export class TrackRound {
@@ -76,6 +150,14 @@ export class TrackRound {
     return this.status === "solved" ? pointsFor(this.solvedOnTry, this.peeks) : 0;
   }
 
+  /** What the peeks have shown: the title's letters (peek 1), then the artist (peek 2). */
+  get hints() {
+    return {
+      title: this.peeks >= 1 ? titleHint(this.song.title) : null,
+      artist: this.peeks >= 2 ? this.song.artist : null,
+    };
+  }
+
   get canPeek() {
     return !this.isOver && this.peeks < MAX_PEEKS;
   }
@@ -89,7 +171,9 @@ export class TrackRound {
   guess(choice) {
     const result = checkGuess(choice, this.song);
     const show = choice.show ? { show: choice.show } : {};
-    this.guesses.push({ title: choice.title, artist: choice.artist, ...show, result });
+    // A wrong song still narrows it down: older or newer, same genre or not.
+    const clues = result !== "correct" && !choice.show ? { clues: cluesFor(choice, this.song) } : {};
+    this.guesses.push({ title: choice.title, artist: choice.artist, ...show, ...clues, result });
     this.updateStatus(result);
     return result;
   }

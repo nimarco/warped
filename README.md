@@ -13,7 +13,7 @@ Warped is a daily song-guessing game. Every day there are four songs, from Easy 
 | 🌀 Warp | The pitch cracks up and down in chunks, like a breaking voice | The jumps get smaller |
 | 🧱 Muffled | Heard through a wall, on a crunchy tape full of static | The wall gets thinner and the static fades |
 
-Before each track, a two-second intro on the TV names its damage (Rickrolled's has a dancing Rick). Each day picks four of them and puts them in a new order (the same for everyone). Every wrong guess or skip eases the damage one step, and try 5 is the clean song. The sooner you name it, the more you score: 250 on try 1, down to 50 on the clean song. Stuck? **Peek** at a pixelated album cover (−25% of the track's points), then the music video (another −50%, since it usually shows the artist).
+Before each track, a two-second intro on the TV names its damage (Rickrolled's has a dancing Rick). Each day picks four of them and puts them in a new order (the same for everyone). Every wrong guess or skip eases the damage one step, and try 5 is the clean song. The sooner you name it, the more you score: 250 on try 1, down to 50 on the clean song. Stuck? **Peek** at the title's first letter and length, shown like closed captions on the TV (`B _ _ _ _ _   _ _ _ _`, −25% of the track's points), then the artist's name (another −50%). Typing an artist lists their songs A to Z, so the artist peek doesn't put the answer at the top of the guess box. Every wrong guess also gives a clue: whether the song came out before or after it, and whether it's the same genre.
 
 After four songs you get a score out of 1000, a streak, and a spoiler-free emoji result to share. **Free Play** offers unlimited extra songs (about 11,000), filtered by genre (country, K-pop, anime, Latin…) and era.
 
@@ -21,10 +21,10 @@ After four songs you get a score out of 1000, a streak, and a spoiler-free emoji
 
 | API | Type | What it does in the game | Code |
 |---|---|---|---|
-| [iTunes Search API](https://performance-partners.apple.com/search-api) | Data | Song previews, album art, music video previews, and the guess autocomplete | `js/itunes.js` |
+| [iTunes Search API](https://performance-partners.apple.com/search-api) | Data | Song previews, album art, the guess autocomplete, and each song's year and genre for the clues | `js/itunes.js` |
 | [AniList API](https://docs.anilist.co) | Data | In Free Play's Anime filter, the guess box also lists anime shows, so you can name the show instead of the song | `js/anilist.js` |
 | [Web Audio API](https://developer.mozilla.org/docs/Web/API/Web_Audio_API) | Browser | The live tape damage, chorus detection, the visualizer feed and sound effects | `js/warp.js` |
-| [Canvas API](https://developer.mozilla.org/docs/Web/API/Canvas_API) | Browser | The pixelated cover hint and the glitching TV visualizer | `js/peek.js`, `js/visualizer.js` |
+| [Canvas API](https://developer.mozilla.org/docs/Web/API/Canvas_API) | Browser | The glitching TV visualizer | `js/visualizer.js` |
 | [Web Storage API](https://developer.mozilla.org/docs/Web/API/Web_Storage_API) | Browser | Streaks, stats and resuming today's progress after a reload | `js/storage.js` |
 | [Clipboard API](https://developer.mozilla.org/docs/Web/API/Clipboard_API) | Browser | Copying the share result | `js/share.js` |
 
@@ -36,7 +36,6 @@ After four songs you get a score out of 1000, a streak, and a spoiler-free emoji
 - **Audio is blocked until a click:** the game waits for the Press play button. iPhone players get a tip about the silent switch.
 - **Storage is blocked** (private browsing): the game still works, and the stats screen explains that nothing will be saved.
 - **Clipboard is blocked:** the result appears in a text box to copy by hand.
-- **No music video exists, or it won't load:** the second peek shows the clear album cover instead.
 - **AniList can't be reached:** the Anime filter's guess box lists songs only, and the reveal leaves out the show's name.
 - **The song-fame file won't load:** guess suggestions keep iTunes' order.
 - **The Rick GIF won't load:** the Rickrolled intro shows its title alone. It never waits more than 2.5 seconds for it.
@@ -64,7 +63,7 @@ index.html        page structure
 style.css         all styling (VHS look; colors and fonts are CSS variables)
 data/songs.js     Daily's song pool (iTunes IDs, difficulty tier, year, genres)
 data/more-songs.js extra Free Play songs, same format
-data/song-fame.js how well known each song is, for ordering guess suggestions
+data/song-fame.js how well known each song is and its year, for guess suggestions and clues
 js/main.js        starts the app and connects everything
 js/config.js      every tunable number (scoring, the six kinds of damage, timing)
 js/game.js        rules for one track (tries, damage level, peeks, points)
@@ -87,6 +86,6 @@ Then open http://localhost:8000.
 
 ## Credits
 
-Song previews, artwork and music videos courtesy of Apple Music via the iTunes Search API. Anime data from AniList. Dancing Rick sticker from GIPHY. Fonts: Archivo and VT323 from Google Fonts.
+Song previews and artwork courtesy of Apple Music via the iTunes Search API. Anime data from AniList. Dancing Rick sticker from GIPHY. Fonts: Archivo and VT323 from Google Fonts.
 
 Built for CSE 2004 (Website #2) with help from Claude Code (Claude Opus 5.5).

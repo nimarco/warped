@@ -121,9 +121,28 @@ export const POINTS_BY_TRY = [250, 200, 150, 100, 50];
 
 export const MAX_TRIES = POINTS_BY_TRY.length;
 
-// What each peek removes from the track's points, in order. The music video
-// usually shows the artist, so it costs much more than the blurry cover:
-// both peeks on try 1 leave 25% (63 points), less than an honest try 4 (100).
+// Clues after a wrong guess, so a player who doesn't know the song can still
+// close in on it (like Wordle's letters): is the song older or newer than the
+// guess, and is it the same kind of music? A year this close counts as "just".
+export const CLUE_CLOSE_YEARS = 2;
+
+// iTunes genre names grouped into broad kinds of music, so "Alternative" and
+// "Hard Rock" count as the same genre. The first match wins (so "Pop Latino"
+// is Latin and "Pop/Rock" is Rock); a genre that fits none counts as itself.
+export const GENRE_FAMILIES = [
+  { name: "Latin", pattern: /latin|latino|mexican|mexicano|reggaeton|urbano|salsa|tropical|bachata/i },
+  { name: "Hip-hop & R&B", pattern: /hip-hop|hip hop|rap|r&b|soul|funk/i },
+  { name: "Country", pattern: /country|americana|bluegrass/i },
+  { name: "Dance", pattern: /dance|electronic|electronica|house|disco|techno|edm|trance/i },
+  { name: "Rock", pattern: /rock|alternative|metal|punk|grunge|new wave|indie/i },
+  { name: "Soundtrack", pattern: /soundtrack|anime|score|musical/i },
+  { name: "Pop", pattern: /pop|singer|vocal|easy listening|adult contemporary/i },
+];
+
+// What each peek removes from the track's points, in order: the title's first
+// letters, then the artist's name. Knowing the artist nearly gives the song
+// away, so it costs much more: both peeks on try 1 leave 25% (63 points), less
+// than an honest try 4 (100).
 // The costs are also written out in index.html (peek buttons and help).
 export const PEEK_COSTS = [0.25, 0.5];
 
@@ -140,6 +159,12 @@ export const FREE_PLAY_SKIPS_DAILY_DAYS = 60;
 // even though a mid-level pop song has more listeners overall. (The Anime
 // filter ranks by `fame` in more-songs.js instead of listeners.)
 export const FREE_PLAY_TIER_SHARES = [0.15, 0.35, 0.3, 0.2];
+
+// With Difficulty on "Any", how often Free Play deals each tier (Easy to
+// Expert), so a room playing together usually gets a song people know. Picking
+// evenly would deal Easy only 15% of the time. A tier with no unplayed songs
+// left is skipped and the others share its odds.
+export const FREE_PLAY_ANY_TIER_ODDS = [0.45, 0.35, 0.15, 0.05];
 
 // Free Play's song filter. "hits" is Daily's song list (Billboard top 40),
 // "all" adds every extra song, and the rest are genres.

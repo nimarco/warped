@@ -7,12 +7,29 @@
  */
 
 import { BUSY_RETRIES, BUSY_RETRY_MS, MAX_SUGGESTIONS, SEARCH_DEBOUNCE_MS } from "./config.js";
-import { toWords } from "./matching.js";
+import { namesTitle, toWords } from "./matching.js";
 
 /** True if every typed word is the start of a word in the song's title or artist (or a show's other name). */
 function matchesTyping(song, typedWords) {
   const songWords = toWords(`${song.title} ${song.artist} ${song.aliases ?? ""}`);
   return typedWords.every((typed) => songWords.some((word) => word.startsWith(typed)));
+}
+
+/**
+ * The order to list suggestions in. Songs whose title was typed come first,
+ * best known first (the order the search gave them). Songs found only by
+ * their artist's name follow from A to Z: listing an artist's biggest hit
+ * first would hand over the answer to anyone who knows (or peeked) the artist.
+ * Anime shows stay on top.
+ */
+function orderForTyping(items, typedWords) {
+  const shows = items.filter((item) => item.show);
+  const songs = items.filter((item) => !item.show);
+  const named = songs.filter((song) => namesTitle(typedWords, song.title, song.artist));
+  const byArtist = songs
+    .filter((song) => !named.includes(song))
+    .sort((a, b) => a.title.localeCompare(b.title, "en", { sensitivity: "base" }));
+  return [...shows, ...named, ...byArtist];
 }
 
 export class Autocomplete {
@@ -136,7 +153,7 @@ export class Autocomplete {
 
   /** List the best few songs, or say that nothing matched. */
   show(songs) {
-    this.songs = songs.slice(0, MAX_SUGGESTIONS);
+    this.songs = orderForTyping(songs, toWords(this.input.value)).slice(0, MAX_SUGGESTIONS);
     this.activeIndex = this.songs.length > 0 ? 0 : -1;
     if (this.songs.length > 0) {
       this.render();

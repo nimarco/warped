@@ -9,6 +9,7 @@ import {
   DISTORTION_ORDER,
   FALLBACK_DISTORTION,
   FREE_PLAY_SKIPS_DAILY_DAYS,
+  FREE_PLAY_ANY_TIER_ODDS,
   FREE_PLAY_TIER_SHARES,
   LAUNCH_DATE,
   RICKROLL_TRACK_ID,
@@ -225,13 +226,39 @@ function upcomingDailyIds() {
  * A random Free Play song that fits the filters and isn't in `playedIds`,
  * like drawing from a shuffled deck. Null once every song there has been played.
  * Songs coming up in Daily are left out, unless that would leave nothing.
+ * On "Any" difficulty, easier tiers come up more often (FREE_PLAY_ANY_TIER_ODDS).
  */
 export function pickFreePlaySong(genre, decade, playedIds, tier = "all") {
   const reserved = upcomingDailyIds();
   const songs = freePlaySongs(genre, decade, tier);
   const unreserved = songs.filter((song) => !reserved.has(song.id));
   const fresh = (unreserved.length > 0 ? unreserved : songs).filter((song) => !playedIds.has(song.id));
-  return fresh.length > 0 ? fresh[Math.floor(Math.random() * fresh.length)] : null;
+  if (fresh.length === 0) {
+    return null;
+  }
+  return tier === "all" ? pickByTierOdds(fresh, tiersFor(genre, decade, songs)) : randomItem(fresh);
+}
+
+/** Deal a tier by FREE_PLAY_ANY_TIER_ODDS (among tiers with songs left), then a song from it. */
+function pickByTierOdds(songs, tiers) {
+  const byTier = new Map();
+  for (const song of songs) {
+    const tier = tiers.get(song.id) ?? FREE_PLAY_TIER_SHARES.length;
+    byTier.set(tier, [...(byTier.get(tier) ?? []), song]);
+  }
+  const odds = [...byTier.keys()].map((tier) => [tier, FREE_PLAY_ANY_TIER_ODDS[tier - 1] ?? 0]);
+  let roll = Math.random() * odds.reduce((sum, [, odd]) => sum + odd, 0);
+  for (const [tier, odd] of odds) {
+    roll -= odd;
+    if (roll < 0) {
+      return randomItem(byTier.get(tier));
+    }
+  }
+  return randomItem(songs);
+}
+
+function randomItem(items) {
+  return items[Math.floor(Math.random() * items.length)];
 }
 
 // A filter option needs at least this many songs to be offered.

@@ -2,8 +2,8 @@
  * itunes.js — DATA API: iTunes Search API
  * https://performance-partners.apple.com/search-api
  *
- * Looks up songs (preview audio + album art), powers the guess autocomplete,
- * and finds music video previews for the Peek hint. No API key needed.
+ * Looks up songs (preview audio + album art) and powers the guess
+ * autocomplete. No API key needed.
  */
 
 import { REQUEST_TIMEOUT_MS } from "./config.js";
@@ -89,6 +89,7 @@ function toSong(result) {
     artist: result.artistName,
     album: result.collectionName,
     year: result.releaseDate ? new Date(result.releaseDate).getFullYear() : null,
+    genre: result.primaryGenreName ?? null,
     previewUrl: result.previewUrl,
     // iTunes returns 100px art; the same URL pattern serves larger sizes.
     artworkUrl: result.artworkUrl100?.replace("100x100bb", "600x600bb"),
@@ -126,7 +127,7 @@ export async function searchSongs(term) {
   // An artist written only in another script (Japanese, say) cleans up to "", so default to that.
   const firstArtist = (result) => splitArtists(result.artistName)[0] ?? "";
   const artistNames = new Set(results.map(firstArtist));
-  const seen = new Set();
+  const seen = new Map();
   const songs = [];
 
   for (const result of results) {
@@ -144,33 +145,25 @@ export async function searchSongs(term) {
     // Different songs can share a title ("Stay" by Rihanna and by The Kid LAROI),
     // so a song is a duplicate only if both the title and the artist match.
     const key = `${title}|${artist}`;
-    // iTunes orders results by popularity, so the songs people mean come first.
+    const song = toSong(result);
     if (!seen.has(key)) {
-      seen.add(key);
-      songs.push(toSong(result));
+      seen.set(key, song);
+      songs.push(song);
+    } else if (song.year && song.year < (seen.get(key).year ?? Infinity)) {
+      // A hit's other versions are often later compilations: keep the earliest year.
+      seen.get(key).year = song.year;
     }
   }
 
   // iTunes orders by how well the words match, not by popularity, so "Memories"
   // puts a dozen unknown songs before Maroon 5. Songs from the game's pools go
-  // first, best known first; the rest keep iTunes' order after them.
+  // first, best known first; the rest keep iTunes' order after them. Pool
+  // songs also take the game's own year for them, the same one the answer uses.
   return songs
-    .map((song, index) => ({ song, index, listeners: known[songKey(song.title, song.artist)] ?? -1 }))
+    .map((song, index) => {
+      const [listeners, year] = known[songKey(song.title, song.artist)] ?? [-1, 0];
+      return { song: year ? { ...song, year } : song, index, listeners };
+    })
     .sort((a, b) => b.listeners - a.listeners || a.index - b.index)
     .map(({ song }) => song);
-}
-
-/** Find a music video preview for a song, or null if there isn't one. */
-export async function findMusicVideo(title, artist) {
-  const data = await getJson("search", { term: `${artist} ${title}`, entity: "musicVideo", limit: 10 });
-  const wantedTitle = normalizeTitle(title);
-  const mainArtist = splitArtists(artist)[0];
-  const match = data.results.find(
-    (item) =>
-      item.previewUrl &&
-      normalizeTitle(item.trackName) === wantedTitle &&
-      splitArtists(item.artistName).includes(mainArtist)
-  );
-
-  return match ? match.previewUrl : null;
 }

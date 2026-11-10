@@ -40,8 +40,6 @@ export const elements = {
 
   tv: $("tv"),
   visualizer: $("visualizer"),
-  peekCanvas: $("peek-canvas"),
-  peekVideo: $("peek-video"),
   revealArt: createRevealArt(),
   retryButton: $("retry-button"),
 
@@ -58,8 +56,8 @@ export const elements = {
     right: $("dpad-right"),
     ok: $("dpad-ok"),
   },
-  peekArtButton: $("peek-art-button"),
-  peekVideoButton: $("peek-video-button"),
+  peekTitleButton: $("peek-title-button"),
+  peekArtistButton: $("peek-artist-button"),
 
   nextButton: $("next-button"),
   shareButton: $("share-button"),
@@ -308,16 +306,11 @@ export function stopCutscene() {
   cutscene?.();
 }
 
-/** What the TV shows: "visualizer", "peek" (pixelated cover), "video" or "art". */
+/** What the TV shows: "visualizer", or "art" (the album cover, once the track is over). */
 export function showPicture(kind, art) {
   elements.visualizer.hidden = kind !== "visualizer";
-  elements.peekCanvas.hidden = kind !== "peek";
-  elements.peekVideo.hidden = kind !== "video";
   elements.revealArt.hidden = kind !== "art";
 
-  if (kind !== "video") {
-    elements.peekVideo.pause();
-  }
   if (kind === "art" && art) {
     elements.revealArt.src = art.url;
     elements.revealArt.alt = art.alt;
@@ -340,6 +333,17 @@ export function twitchAntenna() {
     }
   };
   antenna.addEventListener("animationend", done);
+}
+
+/** A short glitch burst across the picture (after a miss, and when a track ends). */
+let glitchTimer = null;
+export function glitchScreen() {
+  const tv = elements.tv;
+  tv.classList.remove("is-glitching");
+  void tv.offsetWidth; // restart the burst
+  tv.classList.add("is-glitching");
+  clearTimeout(glitchTimer);
+  glitchTimer = setTimeout(() => tv.classList.remove("is-glitching"), 450);
 }
 
 export function setPlaying(isPlaying) {
@@ -366,25 +370,26 @@ export function setWorth(points) {
 }
 
 /**
- * The damage as a VCR tracking meter on the screen: one bar lit on try 1, one
- * more for every miss, all five once the song is clean. Below it, the damage
- * and its current step ("REWIND · 1 S CHOPS"), flashing when a miss eases it.
+ * The damage as a VCR tracking meter on the screen: its name, then one bar lit
+ * on try 1, one more for every miss, all five once the song is clean. It
+ * flashes when a miss eases the damage.
  * level: the current step (0–3), or null when clean.
  */
 export function renderDamage(distortion, level, eased = false) {
   const { name, levels } = DISTORTIONS[distortion];
   const bars = levels.length + 1;
   const lit = level === null ? bars : level + 1;
-  const meter = $("tracking-meter");
   const cells = Array.from({ length: bars }, (_, index) => {
     const cell = document.createElement("span");
     cell.className = index < lit ? "bar is-lit" : "bar";
     return cell;
   });
-  meter.replaceChildren("Tracking ", ...cells);
+  $("tracking-meter").replaceChildren(level === null ? "Clean" : name, ...cells);
+  $("tracking-label").textContent =
+    `Damage: ${name}, ${level === null ? "now clean" : `step ${level + 1} of ${bars}, ${levels[level].label}`}`;
 
-  const step = $("tracking-step");
-  step.textContent = `${name} · ${level === null ? "Clean" : levels[level].label}`;
+  // How warped the picture is: 4 on try 1, down to 0 once clean (see "Glitch" in style.css)
+  elements.tv.dataset.warp = String(level === null ? 0 : bars - 1 - level);
 
   const panel = $("osd-tracking");
   panel.dataset.damage = distortion;
@@ -450,20 +455,115 @@ export function renderGuesses(guesses, animateLast = false) {
     }
 
     row.append(icon, text, note);
+    if (guess?.clues) {
+      const clues = renderClues(guess.clues);
+      if (clues) {
+        row.append(clues);
+      }
+    }
     rows.push(row);
   }
   $("guesses").replaceChildren(...rows);
 }
 
-export function renderPeeks(peeks, canPeek) {
-  const artUsed = peeks >= 1;
-  const videoUsed = peeks >= 2;
-  elements.peekArtButton.disabled = artUsed || !canPeek;
-  elements.peekArtButton.classList.toggle("is-used", artUsed);
-  elements.peekVideoButton.disabled = !artUsed || videoUsed || !canPeek;
-  elements.peekVideoButton.classList.toggle("is-used", videoUsed);
-  // Until the cover's been peeked, say why the video is locked.
-  elements.peekVideoButton.querySelector(".peek-cost").textContent = artUsed ? "−50%" : "after the cover";
+/** A wrong guess's clue chips ("Just after 1982", "Rock ✓"), or null if it has none. */
+function renderClues(clues) {
+  const chips = [];
+  if (clues.when) {
+    const text = {
+      same: `${clues.year} ✓`,
+      before: `${clues.close ? "Just before" : "Before"} ${clues.year}`,
+      after: `${clues.close ? "Just after" : "After"} ${clues.year}`,
+    }[clues.when];
+    chips.push(clueChip(text, clues.when === "same" ? "is-match" : clues.close ? "is-close" : ""));
+  }
+  if (clues.genre) {
+    chips.push(clueChip(clues.sameGenre ? `${clues.genre} ✓` : `Not ${clues.genre}`, clues.sameGenre ? "is-match" : ""));
+  }
+  if (chips.length === 0) {
+    return null;
+  }
+  const line = document.createElement("span");
+  line.className = "guess-clues";
+  const label = document.createElement("span");
+  label.className = "visually-hidden";
+  label.textContent = "The song: ";
+  line.append(label, ...chips);
+  return line;
+}
+
+function clueChip(text, className) {
+  const chip = document.createElement("span");
+  chip.className = `clue ${className}`.trim();
+  chip.textContent = text;
+  return chip;
+}
+
+/** The clues as a sentence for the message line: "It came out just after 1982, and it isn't Rock." */
+export function describeClues(clues = {}) {
+  const parts = [];
+  if (clues.when === "same") {
+    parts.push(`it came out in ${clues.year} too`);
+  } else if (clues.when) {
+    parts.push(`it came out ${clues.close ? "just " : ""}${clues.when} ${clues.year}`);
+  }
+  if (clues.genre) {
+    parts.push(clues.sameGenre ? `it's ${clues.genre} too` : `it isn't ${clues.genre}`);
+  }
+  const sentence = parts.join(", and ");
+  return sentence ? `${sentence[0].toUpperCase()}${sentence.slice(1)}.` : "";
+}
+
+/**
+ * The peek buttons, and the hints they've shown as captions on the TV.
+ * @param {{ title?: string[] | null, artist?: string | null }} hints  from TrackRound.hints (none once the track is over)
+ */
+export function renderPeeks(peeks, canPeek, hints = {}) {
+  const titleUsed = peeks >= 1;
+  const artistUsed = peeks >= 2;
+  elements.peekTitleButton.disabled = titleUsed || !canPeek;
+  elements.peekTitleButton.classList.toggle("is-used", titleUsed);
+  elements.peekArtistButton.disabled = !titleUsed || artistUsed || !canPeek;
+  elements.peekArtistButton.classList.toggle("is-used", artistUsed);
+  // Until the first letter has been peeked, say why the artist is locked.
+  elements.peekArtistButton.querySelector(".peek-cost").textContent = titleUsed ? "−50%" : "after the letter";
+
+  const titleLine = $("caption-title");
+  const artistLine = $("caption-artist");
+  titleLine.hidden = !hints.title;
+  artistLine.hidden = !hints.artist;
+  $("tv-captions").hidden = !hints.title && !hints.artist;
+  if (hints.title) {
+    // Each word on its own, letters spaced out so the blanks can be counted: "B _ _ _ _ _".
+    const words = hints.title.map((word) => {
+      const shown = document.createElement("span");
+      shown.className = "caption-word";
+      shown.textContent = [...word].join(" ");
+      return shown;
+    });
+    const spoken = document.createElement("span");
+    spoken.className = "visually-hidden";
+    spoken.textContent = describeTitleHint(hints.title);
+    const look = document.createElement("span");
+    look.setAttribute("aria-hidden", "true");
+    look.append(...words);
+    titleLine.replaceChildren(spoken, look);
+  }
+  if (hints.artist) {
+    const by = document.createElement("span");
+    by.className = "caption-by";
+    by.textContent = "by ";
+    artistLine.replaceChildren(by, hints.artist);
+  }
+}
+
+/** The title hint in words, for screen readers and the message line. */
+export function describeTitleHint(words) {
+  // Count letters (blanks plus the one shown); punctuation doesn't count.
+  const lengths = words.map((word) => [...word].filter((char) => /[_\p{L}\p{N}]/u.test(char)).length);
+  const first = words.join("").match(/[\p{L}\p{N}]/u)?.[0] ?? "";
+  const count = words.length === 1 ? "one word" : `${words.length} words`;
+  return `The title starts with ${first}: ${count}, ${lengths.join(", ")} letters.`;
 }
 
 /* ---------- Reveal ---------- */
@@ -477,7 +577,12 @@ export function showReveal({ solved, song, points, nextLabel }) {
   eyebrow.textContent = solved ? "▶ Got it" : "■ The song was";
   eyebrow.classList.toggle("is-missed", !solved);
 
-  $("reveal-title").textContent = song.title;
+  // The title arrives warped and snaps clean, like the song just did.
+  const title = $("reveal-title");
+  title.textContent = song.title;
+  title.classList.remove("is-unwarping");
+  void title.offsetWidth;
+  title.classList.add("is-unwarping");
   $("reveal-show").hidden = true;
   $("reveal-meta").textContent = [song.artist, song.year].filter(Boolean).join(" · ");
 

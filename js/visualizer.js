@@ -118,7 +118,7 @@ export class Visualizer {
     const { width, height } = this.canvas;
     const context = this.context;
     const heights = this.levels();
-    const split = this.reduceMotion ? 0 : this.distortion * width * 0.004;
+    const split = this.reduceMotion ? 0 : this.distortion * width * 0.006;
 
     context.clearRect(0, 0, width, height);
 
@@ -132,10 +132,14 @@ export class Visualizer {
     context.globalCompositeOperation = "source-over";
 
     // Tracking error: random horizontal bands slide sideways, like a bad VHS tape.
-    if (!this.reduceMotion && this.distortion > 0 && Math.random() < 0.08 * this.distortion) {
-      const bandHeight = height * (0.03 + Math.random() * 0.06);
+    // Try 1 tears most often, and can tear in two places at once.
+    for (let tear = 0; tear < 2; tear++) {
+      if (this.reduceMotion || this.distortion === 0 || Math.random() >= 0.11 * this.distortion - tear * 0.2) {
+        break;
+      }
+      const bandHeight = height * (0.03 + Math.random() * 0.07);
       const y = Math.random() * (height - bandHeight);
-      const shift = (Math.random() - 0.5) * width * 0.05 * this.distortion;
+      const shift = (Math.random() - 0.5) * width * 0.07 * this.distortion;
       context.drawImage(this.canvas, 0, y, width, bandHeight, shift, y, width, bandHeight);
     }
   }
