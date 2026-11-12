@@ -6,16 +6,16 @@ Warped is a daily song-guessing game. Every day there are four songs, from Easy 
 
 | Damage | What it sounds like | How it eases each try |
 |---|---|---|
-| ⏩ Fast-forward | Too fast and too high: you can't tell who's singing | Slows from 2.5× toward normal speed |
+| ⏩ Fast-forward | Too fast and too high: you can't tell who's singing | Slows from 2.3× toward normal speed |
 | ⏪ Rewind | Chopped into pieces that play backwards | The pieces get shorter, from the whole clip to tiny chops |
-| 🕺 Rickrolled | Someone taped *Never Gonna Give You Up* over it | Rick gets quieter |
+| 🕺 Rickrolled | Someone taped *Never Gonna Give You Up* over it | Rick gets quieter: 100% of the song's loudness, then 75%, 50%, 25% |
 | 🐕 Chewed | A dog got to the tape: holes of hiss, stutters and backwards bits | Holes get patched (and stay patched) |
 | 🌀 Warp | The pitch cracks up and down in chunks, like a breaking voice | The jumps get smaller |
 | 🧱 Muffled | Heard through a wall, on a crunchy tape full of static | The wall gets thinner and the static fades |
 
 Before each track, a two-second intro on the TV names its damage (Rickrolled's has a dancing Rick). Each day picks four of them and puts them in a new order (the same for everyone). Every wrong guess or skip eases the damage one step, and try 5 is the clean song. The sooner you name it, the more you score: 250 on try 1, down to 50 on the clean song. Stuck? **Peek** at the title's first letter and length, shown like closed captions on the TV (`B _ _ _ _ _   _ _ _ _`, −25% of the track's points), then the artist's name (another −50%). Typing an artist lists their songs A to Z, so the artist peek doesn't put the answer at the top of the guess box. Every wrong guess also gives a clue: whether the song came out before or after it, and whether it's the same genre.
 
-After four songs you get a score out of 1000, a streak, and a spoiler-free emoji result to share. **Free Play** offers unlimited extra songs (about 11,000), filtered by genre (country, K-pop, anime, Latin…) and era.
+Play the four tracks in any order: tap a tape to switch, and each keeps its tries. The TV shows how damaged the tape is right now (`WARP ±6 ▮▮▯▯▯`), and a neon sign on the wall changes with the damage (*be kind, rewind*). After four songs you get a score out of 1000, a streak, and a spoiler-free emoji result to share. **Free Play** offers unlimited extra songs (about 11,000), filtered by genre (country, K-pop, anime, Latin…) and era.
 
 ## APIs used
 
@@ -46,13 +46,14 @@ After four songs you get a score out of 1000, a streak, and a spoiler-free emoji
 - **The damage is live.** `warp.js` downloads the normal 30-second preview, decodes it with Web Audio, and changes it as it plays: Fast-forward raises the playback rate, Rewind rebuilds the clip from backwards pieces with short crossfades so the cuts don't click, Rickrolled mixes in a second preview at a volume matched to the song's loudness, Chewed swaps fixed patches for hiss, stutters or backwards audio, Warp pitch-shifts chunks without changing their timing (short overlapping grains, each read faster or slower), and Muffled runs it through a low-pass filter and a bitcrusher, then adds static matched to the song's loudness (a filter alone kept the tune too easy to hum).
 - **Every try is easier than the last, for every song.** Each track uses one kind of damage and only turns it down, so a later try can never be harder than an earlier one. (Earlier versions stacked four effects and peeled them off, but skipping the hardest one made the song suddenly easy.)
 - **Free Play lets you pick the damage**, or mixes them at random.
-- **The clip is the chorus.** The game measures loudness across the preview and plays the loudest 10 seconds.
+- **The clip is where someone's singing.** The loudest part of a preview is often an instrumental drop, so the game scores each half second for bright sound in the middle of the stereo mix (where vocals usually sit, above the bass) and plays the best 10 seconds, with loudness as a tiebreaker.
 - **Guesses are matched by cleaned-up title and artist,** because one song has many iTunes IDs (single, album, remaster).
 - **The hit comes first.** iTunes lists search results by how well the words match, so "Memories" used to bury Maroon 5 under a dozen unknown songs. The guess box now puts the game's songs first, best known first, using listener counts stored under a scrambled key (`data/song-fame.js`) so the file doesn't list any titles.
 - **Typing lyrics doesn't work.** iTunes also searches lyrics, so the guess box only lists songs whose title or artist matches at least half the typed words (small typos are fine). Otherwise you could type what you hear without knowing the song.
 - **The song list stores only iTunes IDs,** so reading the source doesn't spoil answers.
 - **Difficulty is how well known a song is today.** Daily's pool is every clean song from Billboard's Year-End Hot 100 top 40, 1970–2025, plus a few classics that never placed there. Each song's tier comes mostly from how much people listen to it (Last.fm listeners) and look it up (Wikipedia pageviews over the last year), partly from that within its genre, a little from its year-end rank, and from how recent it is (most players are college students, so older songs lean harder). Easy is songs from 2000 on, plus older ones every generation knows (*Billie Jean*, *Bohemian Rhapsody*), so a 2002 hit nobody plays anymore is Hard while *Take On Me* is Easy. (One-time scripts looked the counts up; the site itself never calls Last.fm or Wikipedia.)
 - **Free Play has a difficulty dial.** Pick Easy to Expert on the remote and you only get songs from that tier of your current mix.
+- **Free Play leans recent.** Listener counts skew toward older listeners, so Free Play adds a boost for songs from the late 1990s on when it ranks them, so Easy is mostly 2010s and 2020s hits. Picking a decade still ranks by fame within it.
 - **Free Play rates songs within your filter.** With the Anime filter on, a song is compared only with other anime songs, so *Unravel* is Easy there even though plenty of pop songs have more listeners. Anime songs are rated by AnisongDB, the database behind Anime Music Quiz, which records how many quiz players name the show from each song. Last.fm misses songs fans mostly hear in the show (One Piece's *We Are!* has only about 5,000 listeners there). Songs AnisongDB doesn't have fall back to how popular the show is and whether the song is an early opening.
 - **Free Play goes deeper.** Besides Daily's songs it has Billboard's genre number ones (country, R&B, rock, alternative, Latin), Korea's Circle Chart number ones, openings and endings from the 400 most popular anime on AniList, Apple's current genre charts, and Hot 100 ranks 41–100. That file only loads when Free Play opens, and Daily never uses it.
 - **Name the anime instead.** In Free Play's Anime filter you can guess the show. Any season, movie or spin-off of it counts ("Naruto" is right for a *Naruto: Shippuden* opening), because the song list stores each show's whole franchise as AniList IDs (no names, so the source doesn't spoil it).
@@ -86,6 +87,6 @@ Then open http://localhost:8000.
 
 ## Credits
 
-Song previews and artwork courtesy of Apple Music via the iTunes Search API. Anime data from AniList. Dancing Rick sticker from GIPHY. Fonts: Archivo and VT323 from Google Fonts.
+Song previews and artwork courtesy of Apple Music via the iTunes Search API. Anime data from AniList. Dancing Rick sticker from GIPHY. Fonts: Archivo, VT323 and Permanent Marker from Google Fonts.
 
 Built for CSE 2004 (Website #2) with help from Claude Code (Claude Opus 5.5).

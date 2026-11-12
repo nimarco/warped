@@ -89,11 +89,32 @@ export function setMode(mode) {
  * default pink), and brightens while a clip plays (see setPlaying).
  */
 export function setAmbience(distortion) {
+  const changed = (document.body.dataset.damage ?? null) !== (distortion ?? null);
   if (distortion) {
     document.body.dataset.damage = distortion;
   } else {
     delete document.body.dataset.damage;
   }
+  if (changed) {
+    flickerNeon();
+  }
+}
+
+const NEON_FLICKER_MS = 900;
+let neonTimer = null;
+
+/** The neon sign stutters off and back on when its words change, like a tube warming up. */
+function flickerNeon() {
+  const sign = document.querySelector(".room-neon");
+  if (!sign) {
+    return;
+  }
+  sign.classList.remove("is-switching");
+  void sign.offsetWidth; // restart the flicker
+  sign.classList.add("is-switching");
+  // Back to its usual hum once the flicker is done (a timer, so it can't get stuck)
+  clearTimeout(neonTimer);
+  neonTimer = setTimeout(() => sign.classList.remove("is-switching"), NEON_FLICKER_MS);
 }
 
 /** "NOV 05 2026", the way a camcorder stamps the date. */

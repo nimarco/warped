@@ -20,7 +20,11 @@
 </head>
 <body>
   <!-- The room around the TV: its glow takes the current damage's color (styles under "The room") -->
-  <div class="room" aria-hidden="true"><div class="room-glow"></div><div class="room-tracking"></div></div>
+  <div class="room" aria-hidden="true">
+    <div class="room-glow"></div><div class="room-tracking"></div>
+    <!-- A neon sign on the wall whose words change with the damage (style.css "The room") -->
+    <p class="room-neon"></p>
+  </div>
   <a class="skip-link" href="#game">Skip to the game</a>
 
   <header class="topbar">

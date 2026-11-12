@@ -6,10 +6,12 @@
  */
 
 import {
+  DAILY_SWAPS,
   DISTORTION_ORDER,
   FALLBACK_DISTORTION,
   FREE_PLAY_SKIPS_DAILY_DAYS,
   FREE_PLAY_ANY_TIER_ODDS,
+  FREE_PLAY_RECENCY,
   FREE_PLAY_TIER_SHARES,
   LAUNCH_DATE,
   RICKROLL_TRACK_ID,
@@ -67,6 +69,18 @@ function shuffle(items, random) {
  * Songs don't repeat until a tier's whole pool has been used.
  */
 export function getDailyLineup(puzzleNumber) {
+  const lineup = shuffledLineup(puzzleNumber);
+  for (const [first, second, tier] of DAILY_SWAPS) {
+    const other = puzzleNumber === first ? second : puzzleNumber === second ? first : null;
+    if (other !== null) {
+      lineup[tier - 1] = shuffledLineup(other)[tier - 1];
+    }
+  }
+  return lineup;
+}
+
+/** The lineup the seeded shuffle gives a day, before any hand-made swaps. */
+function shuffledLineup(puzzleNumber) {
   const lineup = [];
 
   for (let tier = 1; tier <= TRACKS_PER_DAY; tier++) {
@@ -167,13 +181,13 @@ const tierCache = new Map();
 /**
  * Tiers among the songs a filter allows, by how many of them are better known
  * (FREE_PLAY_TIER_SHARES: the best-known 15% are Easy, and so on). Usually
- * that's Last.fm listeners; the Anime filter uses `fame`, which also counts the
+ * that's Last.fm listeners tilted toward recent songs (howKnown); the Anime filter uses `fame`, which also counts the
  * show's popularity, because Last.fm misses songs fans hear in the show.
  */
 function tiersFor(genre, decade, songs) {
   const key = `${genre}|${decade}|${songs.length}`;
   if (!tierCache.has(key)) {
-    const known = genre === "anime" ? (song) => song.fame ?? 0 : (song) => song.listeners ?? 0;
+    const known = genre === "anime" ? (song) => song.fame ?? 0 : howKnown;
     const sorted = [...songs].sort((a, b) => known(b) - known(a));
     const tiers = new Map();
     let ahead = 0;
@@ -187,6 +201,13 @@ function tiersFor(genre, decade, songs) {
     tierCache.set(key, tiers);
   }
   return tierCache.get(key);
+}
+
+/** How well a song is known now: Last.fm listeners (log scale), tilted toward recent songs. */
+function howKnown(song) {
+  const { weight, from, to } = FREE_PLAY_RECENCY;
+  const recency = Math.min(Math.max((song.year - from) / (to - from), 0), 1);
+  return Math.log10((song.listeners ?? 0) + 1) + weight * recency;
 }
 
 function tierAt(position) {

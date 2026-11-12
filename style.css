@@ -146,6 +146,75 @@ body.is-playing .room-glow {
   70% { opacity: 0.88; }
 }
 
+/* A neon sign on the wall that changes with the track's damage, in its
+   color: "be kind, rewind" for Rewind, "now playing" between tracks */
+.room-neon {
+  position: absolute;
+  top: 88px;
+  right: max(28px, calc(50vw - 600px));
+  color: #fff3f7;
+  font-family: "Permanent Marker", var(--font-body);
+  font-size: 24px;
+  line-height: 1;
+  white-space: nowrap;
+  transform: rotate(-3deg);
+  text-shadow:
+    0 0 2px #fff,
+    0 0 8px var(--damage-color),
+    0 0 18px var(--damage-color),
+    0 0 40px var(--damage-color);
+  animation: neon-hum 7s steps(1) infinite;
+}
+
+.room-neon::after {
+  content: "now playing";
+}
+
+[data-damage="rewind"] .room-neon::after { content: "be kind, rewind"; }
+[data-damage="fastforward"] .room-neon::after { content: "skip to the good part"; }
+[data-damage="rickroll"] .room-neon::after { content: "never gonna give you up"; }
+[data-damage="chewed"] .room-neon::after { content: "the dog ate my tape"; }
+[data-damage="warp"] .room-neon::after { content: "pitch, please"; }
+[data-damage="muffled"] .room-neon::after { content: "turn it up!"; }
+
+/* The sign's light on the wall around it */
+.room-neon::before {
+  content: "";
+  position: absolute;
+  inset: -80px -110px;
+  z-index: -1;
+  background: radial-gradient(closest-side, var(--damage-glow), transparent);
+  opacity: 0.6;
+}
+
+/* When the words change: dark, a couple of stutters, then on (ui.js flickerNeon) */
+.room-neon.is-switching {
+  animation: neon-switch 0.9s steps(1);
+}
+
+@keyframes neon-switch {
+  0% { opacity: 0.08; }
+  18% { opacity: 0.9; }
+  26% { opacity: 0.1; }
+  44% { opacity: 1; }
+  52% { opacity: 0.25; }
+  60%, 100% { opacity: 1; }
+}
+
+@keyframes neon-hum {
+  0%, 62%, 66%, 100% { opacity: 1; }
+  63% { opacity: 0.55; }
+  65% { opacity: 0.85; }
+}
+
+/* Only where there's wall to hang it on */
+@media (max-width: 1199px) {
+  .room-neon {
+    display: none;
+  }
+}
+
+
 /* A VHS tracking band that rolls down the room now and then */
 .room-tracking {
   position: absolute;
@@ -495,9 +564,35 @@ svg {
   color: var(--text-dim);
 }
 
-.button-primary:hover:not(:disabled) {
+.button-primary:hover:not(:disabled):not(.is-waiting) {
   border-color: var(--accent-hover);
   background: var(--accent-hover);
+}
+
+/* Neon on the one thing to press next: Press play, Guess (once there's
+   something to guess), Next track, Copy my result. A pink tube glow that
+   flickers on as the button lights up, like the sign on the wall. Secondary
+   buttons (Skip, peeks, Listen on Apple Music) stay unlit on purpose. */
+.button-primary:not(.is-waiting):not(:disabled) {
+  box-shadow:
+    0 0 0 1px rgba(255, 196, 218, 0.9),
+    0 0 10px rgba(255, 61, 127, 0.65),
+    0 0 28px rgba(255, 61, 127, 0.4);
+  animation: neon-on 0.5s steps(1);
+}
+
+.button-primary:hover:not(:disabled):not(.is-waiting) {
+  box-shadow:
+    0 0 0 1px rgba(255, 214, 228, 1),
+    0 0 14px rgba(255, 61, 127, 0.8),
+    0 0 40px rgba(255, 61, 127, 0.55);
+}
+
+@keyframes neon-on {
+  0% { box-shadow: none; }
+  30% { box-shadow: 0 0 0 1px rgba(255, 196, 218, 0.9), 0 0 10px rgba(255, 61, 127, 0.65), 0 0 28px rgba(255, 61, 127, 0.4); }
+  45% { box-shadow: none; }
+  65% { box-shadow: 0 0 0 1px rgba(255, 196, 218, 0.9), 0 0 10px rgba(255, 61, 127, 0.65), 0 0 28px rgba(255, 61, 127, 0.4); }
 }
 
 .button svg.icon-solid {
@@ -1638,6 +1733,12 @@ body.is-playing .antenna-rod + .antenna-rod {
 
 .play-button:hover:not(:disabled) {
   background: var(--accent-hover);
+}
+
+/* The set's play button is the round's main control: it carries the same
+   neon glow (as a drop shadow, so the inviting pulse can keep its ring) */
+.play-button:not(:disabled) {
+  filter: drop-shadow(0 0 8px rgba(255, 61, 127, 0.55));
 }
 
 .play-button:active:not(:disabled) {
@@ -2984,6 +3085,12 @@ dd {
 @media (prefers-reduced-motion: reduce) {
   .room-tracking {
     display: none;
+  }
+
+  .room-neon,
+  .room-neon.is-switching,
+  .button-primary:not(.is-waiting):not(:disabled) {
+    animation: none;
   }
 
   *,

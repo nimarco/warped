@@ -83,7 +83,7 @@ export const DISTORTIONS = {
     // value: low-pass cutoff in Hz (the wall). static: how loud the static is
     // next to the song (1 = equally loud); it also sets how crunchy the tape is.
     levels: [
-      { value: 150, static: 0.9, label: "Next door" },
+      { value: 150, static: 0.8, label: "Next door" },
       { value: 350, static: 0.55, label: "Thick wall" },
       { value: 800, static: 0.28, label: "Thin wall" },
       { value: 1800, static: 0.08, label: "Pillow" },
@@ -155,6 +155,11 @@ export const MAX_PEEKS = PEEK_COSTS.length;
 
 export const TRACKS_PER_DAY = 4;
 
+// Hand-made swaps in the daily lineup: [puzzle A, puzzle B, tier] trades that
+// tier's song (and its backups) between the two days. Tape 16 (Nov 17, 2026)
+// and tape 17 (Nov 18) swap their Easy songs (user's call, 2026-11-11).
+export const DAILY_SWAPS = [[16, 17, 1]];
+
 // Free Play leaves out the songs Daily will play in this many days, so it can't spoil them.
 export const FREE_PLAY_SKIPS_DAILY_DAYS = 60;
 
@@ -164,6 +169,12 @@ export const FREE_PLAY_SKIPS_DAILY_DAYS = 60;
 // even though a mid-level pop song has more listeners overall. (The Anime
 // filter ranks by `fame` in more-songs.js instead of listeners.)
 export const FREE_PLAY_TIER_SHARES = [0.15, 0.35, 0.3, 0.2];
+
+// Last.fm's listeners skew older, so a 2006 hit can outrank a 2019 one a
+// college crowd knows by heart. Free Play's ranking adds this much to a song's
+// log10(listeners) for being recent: 0 for songs up to FROM, rising to WEIGHT
+// at TO and after (2026-11-11, user: "a bunch of songs idk on easy").
+export const FREE_PLAY_RECENCY = { weight: 1.5, from: 1995, to: 2015 };
 
 // With Difficulty on "Any", how often Free Play deals each tier (Easy to
 // Expert), so a room playing together usually gets a song people know. Picking
