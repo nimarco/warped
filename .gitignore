@@ -7,6 +7,10 @@ ASSIGNMENT.md
 lab/
 .claude/
 CLAUDE.md
+PRODUCT.md
+DESIGN.md
+DESIGN.*.json
+.impeccable/
 
 # Submission ZIPs
 *.zip

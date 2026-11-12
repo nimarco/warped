@@ -5,10 +5,11 @@
  */
 
 import { DISTORTION_ORDER, DISTORTIONS, FREE_PLAY_GENRES, MAX_TRIES, TIER_NAMES } from "./config.js";
+import { cleanTitle } from "./game.js";
 
 const $ = (id) => document.getElementById(id);
 
-/** The revealed album cover. Created here because an <img> needs a real src to be valid HTML. */
+/** The revealed album cover. Created here because an image element in the HTML would need a real src to be valid. */
 function createRevealArt() {
   const image = document.createElement("img");
   image.className = "tv-picture";
@@ -130,7 +131,9 @@ export function renderTrackProgress(tracks, currentIndex, distortions) {
     name.textContent = TIER_NAMES[tier];
     const damage = document.createElement("span");
     damage.className = "track-damage";
-    damage.textContent = DISTORTIONS[distortions[index]].osd;
+    // The VCR symbol and the damage's name ("● Rickrolled"), not the OSD code ("● REC")
+    const { osd, name: damageName } = DISTORTIONS[distortions[index]];
+    damage.textContent = `${osd.split(" ")[0]} ${damageName}`;
     const value = document.createElement("strong");
 
     if (track?.status === "solved") {
@@ -386,7 +389,7 @@ export function renderDamage(distortion, level, eased = false) {
   });
   $("tracking-meter").replaceChildren(level === null ? "Clean" : name, ...cells);
   $("tracking-label").textContent =
-    `Damage: ${name}, ${level === null ? "now clean" : `step ${level + 1} of ${bars}, ${levels[level].label}`}`;
+    level === null ? `${name}: clean now` : `${name}: ${levels[level].label}, step ${level + 1} of ${bars}`;
 
   // How warped the picture is: 4 on try 1, down to 0 once clean (see "Glitch" in style.css)
   elements.tv.dataset.warp = String(level === null ? 0 : bars - 1 - level);
@@ -401,10 +404,20 @@ export function renderDamage(distortion, level, eased = false) {
   }
 }
 
-/** tone: "wrong" | "partial" | "info" | "" */
-export function setMessage(text, tone = "") {
+/**
+ * The line under the guess box (announced to screen readers).
+ * @param {string} tone  "miss" | "partial" | "info" | ""
+ * @param {string} [spoken]  extra words only screen readers hear (the clues the chips show)
+ */
+export function setMessage(text, tone = "", spoken = "") {
   const message = $("message");
   message.textContent = text;
+  if (spoken) {
+    const extra = document.createElement("span");
+    extra.className = "visually-hidden";
+    extra.textContent = ` ${spoken}`;
+    message.append(extra);
+  }
   message.className = tone ? `message is-${tone}` : "message";
 }
 
@@ -579,12 +592,15 @@ export function showReveal({ solved, song, points, nextLabel }) {
 
   // The title arrives warped and snaps clean, like the song just did.
   const title = $("reveal-title");
-  title.textContent = song.title;
+  // The big title without "(feat. …)" or "- Remastered"; a featured artist moves to the line below.
+  title.textContent = cleanTitle(song.title);
   title.classList.remove("is-unwarping");
   void title.offsetWidth;
   title.classList.add("is-unwarping");
   $("reveal-show").hidden = true;
-  $("reveal-meta").textContent = [song.artist, song.year].filter(Boolean).join(" · ");
+  const featuring = song.title.match(/\((?:feat|ft)\.\s*([^)]+)\)/i)?.[1];
+  const artist = featuring ? `${song.artist} feat. ${featuring}` : song.artist;
+  $("reveal-meta").textContent = [artist, song.year].filter(Boolean).join(" · ");
 
   const pointsText = $("reveal-points");
   pointsText.textContent = solved ? `+${points} pts` : "0 pts";

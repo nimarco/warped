@@ -29,7 +29,24 @@ function orderForTyping(items, typedWords) {
   const byArtist = songs
     .filter((song) => !named.includes(song))
     .sort((a, b) => a.title.localeCompare(b.title, "en", { sensitivity: "base" }));
-  return [...shows, ...named, ...byArtist];
+  return { ordered: [...shows, ...named, ...byArtist], named: named.length + shows.length, byArtist };
+}
+
+/**
+ * When only an artist was typed and their songs don't all fit, say why the
+ * hit isn't on top: "8 of 31 songs by Outkast, A to Z. Type part of the title."
+ * Null when the list needs no explaining.
+ */
+function artistHint(byArtist, named, shown) {
+  if (named > 0 || byArtist.length <= shown) {
+    return null;
+  }
+  const counts = new Map();
+  for (const song of byArtist) {
+    counts.set(song.artist, (counts.get(song.artist) ?? 0) + 1);
+  }
+  const [artist] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+  return `${shown} of ${byArtist.length} songs by ${artist}, A to Z. Type part of the title to find yours.`;
 }
 
 export class Autocomplete {
@@ -44,6 +61,7 @@ export class Autocomplete {
     this.list = list;
     this.search = search;
     this.songs = [];
+    this.hint = null;
     this.found = { term: "", songs: [] };
     this.activeIndex = -1;
     this.chosen = null;
@@ -153,7 +171,9 @@ export class Autocomplete {
 
   /** List the best few songs, or say that nothing matched. */
   show(songs) {
-    this.songs = orderForTyping(songs, toWords(this.input.value)).slice(0, MAX_SUGGESTIONS);
+    const { ordered, named, byArtist } = orderForTyping(songs, toWords(this.input.value));
+    this.songs = ordered.slice(0, MAX_SUGGESTIONS);
+    this.hint = artistHint(byArtist, named, this.songs.length);
     this.activeIndex = this.songs.length > 0 ? 0 : -1;
     if (this.songs.length > 0) {
       this.render();
@@ -184,7 +204,7 @@ export class Autocomplete {
       option.setAttribute("aria-selected", String(selected));
       if (selected) {
         this.input.setAttribute("aria-activedescendant", option.id);
-        option.scrollIntoView({ block: "nearest" });
+        this.keepInList(option);
       }
     }
   }
@@ -228,9 +248,26 @@ export class Autocomplete {
     this.close();
   }
 
+  /** Scroll the list (never the page) so the highlighted song is visible. */
+  keepInList(option) {
+    const { list } = this;
+    const top = option.offsetTop;
+    const bottom = top + option.offsetHeight;
+    if (top < list.scrollTop) {
+      list.scrollTop = top;
+    } else if (bottom > list.scrollTop + list.clientHeight) {
+      list.scrollTop = bottom - list.clientHeight;
+    }
+  }
+
   open() {
     this.list.hidden = false;
     this.input.setAttribute("aria-expanded", "true");
+    // Near the bottom of the window (the guess box under the TV on a laptop,
+    // or above a phone's keyboard), open upward over the set instead.
+    const box = this.input.getBoundingClientRect();
+    const below = window.innerHeight - box.bottom;
+    this.list.classList.toggle("opens-up", below < 260 && box.top > below);
   }
 
   close() {
@@ -273,6 +310,12 @@ export class Autocomplete {
       return option;
     });
 
+    if (this.hint) {
+      const hint = document.createElement("li");
+      hint.className = "suggestion-message suggestion-hint";
+      hint.textContent = this.hint;
+      options.push(hint);
+    }
     this.list.replaceChildren(...options);
     this.open();
     this.setActive(this.activeIndex);

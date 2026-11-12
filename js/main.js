@@ -5,6 +5,7 @@
  */
 
 import {
+  BOOT_FONT_WAIT_MS,
   BUSY_RETRIES,
   BUSY_RETRY_MS,
   CUTSCENE_GIF_MS,
@@ -378,11 +379,12 @@ async function togglePlay() {
 
 /* ---------- Guessing ---------- */
 
+// A miss is progress: the tape gets cleaner. So it reads calm, not as an error.
 const RESULT_MESSAGES = {
-  wrong: { text: "Not it.", tone: "wrong", blip: "wrong" },
+  wrong: { text: "Not it.", tone: "miss", blip: "wrong" },
   artist: { text: "Right artist, wrong song!", tone: "partial", blip: "partial" },
   title: { text: "Right title, different artist!", tone: "partial", blip: "partial" },
-  skip: { text: "Skipped.", tone: "info", blip: null },
+  skip: { text: "Skipped.", tone: "miss", blip: null },
 };
 
 async function submitGuess(event) {
@@ -448,12 +450,12 @@ function afterTry(result) {
     playBlip(feedback.blip);
   }
   const triesLeft = MAX_TRIES - round.guesses.length;
-  const distortion = DISTORTIONS[round.distortion];
-  const unwarp = round.level === null
-    ? "Last try: this is the real song."
-    : `${distortion.name} eased to ${distortion.levels[round.level].label}. ${triesLeft} tries left.`;
+  const progress = round.level === null
+    ? "Last try: the tape is clean now."
+    : `The tape's a notch cleaner. ${triesLeft} ${triesLeft === 1 ? "try" : "tries"} left.`;
+  // The clue chips on the guess show the clues; screen readers hear them here too.
   const clues = ui.describeClues(round.guesses.at(-1).clues);
-  ui.setMessage([feedback.text, clues, unwarp].filter(Boolean).join(" "), feedback.tone);
+  ui.setMessage(`${feedback.text} ${progress}`, feedback.tone, clues);
   renderRound(true, true);
 
   // Play the slightly clearer version after a short beat.
@@ -824,9 +826,25 @@ elements.helpDialog.addEventListener("close", markHelpSeen);
 
 /* ---------- Start ---------- */
 
+/**
+ * Reveal the page (hidden by the "is-booting" class in index.html) once it's
+ * built and the fonts it's drawn in have loaded, so a refresh never flashes
+ * stand-in fonts. A slow or blocked font server only delays it so long.
+ */
+function showPageWhenReady() {
+  const fonts = ["700 1em Archivo", "1em VT323", '1em "Permanent Marker"'].map((font) =>
+    document.fonts.load(font).catch(() => null)
+  );
+  const timeout = new Promise((resolve) => setTimeout(resolve, BOOT_FONT_WAIT_MS));
+  Promise.race([Promise.all(fonts), timeout]).then(() => {
+    document.documentElement.classList.remove("is-booting");
+  });
+}
+
 renderFreeFilters();
 ui.showSilentTip(/iPhone|iPad|iPod/.test(navigator.userAgent));
 enterDaily();
+showPageWhenReady();
 
 if (!hasSeenHelp()) {
   elements.helpDialog.showModal();

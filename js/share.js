@@ -37,7 +37,9 @@ export function buildShareText({ puzzleNumber, rounds, total, streak }) {
   const streakLine = streak > 1 ? `\n🔥 ${streak}-day streak` : "";
   const url = `${window.location.origin}${window.location.pathname}`;
 
-  return `WARPED #${puzzleNumber} · ${total}/1000${streakLine}\n${lines.join("\n")}\n${url}`;
+  // "Tape 08", the same as the date stamp on the intro
+  const tape = String(puzzleNumber).padStart(2, "0");
+  return `WARPED · TAPE ${tape} · ${total}/1000${streakLine}\n${lines.join("\n")}\n${url}`;
 }
 
 /** Copy text to the clipboard. Resolves true on success, false if blocked. */
