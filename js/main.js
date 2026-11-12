@@ -180,7 +180,7 @@ async function startTrack(candidates, tier, distortion, saved, attempt = 1) {
     ui.setAmbience(damage);
     // Start looking for Rick's GIF now; the intro waits a moment for it.
     const gif = damage === "rickroll" ? loadRickGif() : null;
-    app.clipStart = player.findLoudestStart();
+    app.clipStart = player.findClipStart();
     ui.setTvStatus(null);
     saveProgress();
     if (app.mode === "free") {
@@ -253,7 +253,7 @@ async function showIntro(round, gifSearch) {
 
 function trackLabel(tier) {
   if (app.mode === "free") {
-    return `FREE · ${TIER_NAMES[tier].toUpperCase()}`;
+    return `FREE PLAY · ${TIER_NAMES[tier].toUpperCase()}`;
   }
   return `TRACK ${app.day.current + 1}/${TRACKS_PER_DAY}`;
 }
@@ -371,9 +371,16 @@ async function togglePlay() {
   }
   try {
     await unlockAudio();
-    playClip({ clean: app.round.isOver });
   } catch {
     ui.setMessage("Your browser blocked audio. Click play again to allow it.", "wrong");
+    return;
+  }
+  try {
+    playClip({ clean: app.round.isOver });
+  } catch {
+    // Not the browser's fault: say so plainly instead of blaming the audio permission.
+    stopClip();
+    ui.setMessage("Couldn't play this clip. Press play to try again, or skip it.", "wrong");
   }
 }
 
@@ -449,10 +456,12 @@ function afterTry(result) {
   if (feedback.blip) {
     playBlip(feedback.blip);
   }
+  // Say how far the damage eased ("Muffled eased to Thick wall"), and how many tries are left.
   const triesLeft = MAX_TRIES - round.guesses.length;
+  const distortion = DISTORTIONS[round.distortion];
   const progress = round.level === null
-    ? "Last try: the tape is clean now."
-    : `The tape's a notch cleaner. ${triesLeft} ${triesLeft === 1 ? "try" : "tries"} left.`;
+    ? "Last try: this is the real song."
+    : `${distortion.name} eased to ${distortion.levels[round.level].label}. ${triesLeft} ${triesLeft === 1 ? "try" : "tries"} left.`;
   // The clue chips on the guess show the clues; screen readers hear them here too.
   const clues = ui.describeClues(round.guesses.at(-1).clues);
   ui.setMessage(`${feedback.text} ${progress}`, feedback.tone, clues);
@@ -526,7 +535,7 @@ function showReveal(playSong) {
   ui.renderDamage(round.distortion, null);
   visualizer.setDistortion(0);
 
-  const isLastDaily = app.mode === "daily" && app.day.current === TRACKS_PER_DAY - 1;
+  const isLastDaily = app.mode === "daily" && nextOpenTrack() === null;
   ui.showReveal({
     solved,
     song: round.song,
@@ -566,13 +575,43 @@ function next() {
     return;
   }
 
-  if (app.day.current < TRACKS_PER_DAY - 1) {
-    app.day.current += 1;
+  const upNext = nextOpenTrack();
+  if (upNext === null) {
+    finishDay();
+  } else {
+    app.day.current = upNext;
     saveDay(app.day);
     loadDailyTrack();
-  } else {
-    finishDay();
   }
+}
+
+/** A track is done once it's solved or missed (a saved track still "playing" isn't). */
+function isTrackDone(index) {
+  const status = app.day.tracks[index]?.status;
+  return status === "solved" || status === "missed";
+}
+
+/** The next unfinished track after the current one (wrapping around), or null when all four are done. */
+function nextOpenTrack() {
+  for (let step = 1; step <= TRACKS_PER_DAY; step++) {
+    const index = (app.day.current + step) % TRACKS_PER_DAY;
+    if (!isTrackDone(index)) {
+      return index;
+    }
+  }
+  return null;
+}
+
+/** Jump to any of today's tracks (tap its tape). Progress on the one you leave is kept. */
+function switchDailyTrack(index) {
+  if (app.mode !== "daily" || index === app.day.current || app.day.finished) {
+    return;
+  }
+  stopClip();
+  ui.stopCutscene();
+  app.day.current = index;
+  saveDay(app.day);
+  loadDailyTrack();
 }
 
 /* ---------- Daily progress ---------- */
@@ -731,6 +770,12 @@ function openStats() {
 /* ---------- Events ---------- */
 
 elements.startButton.addEventListener("click", startDaily);
+elements.trackProgress.addEventListener("click", (event) => {
+  const jump = event.target.closest("[data-track]");
+  if (jump) {
+    switchDailyTrack(Number(jump.dataset.track));
+  }
+});
 elements.playButton.addEventListener("click", togglePlay);
 elements.guessForm.addEventListener("submit", submitGuess);
 elements.skipButton.addEventListener("click", skip);

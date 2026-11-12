@@ -408,7 +408,7 @@ svg {
   width: 100%;
   max-width: calc(var(--content-width) + 32px);
   margin: 0 auto;
-  padding: 8px 16px 40px;
+  padding: 8px 16px 20px;
 }
 
 .game:focus {
@@ -425,7 +425,7 @@ svg {
 }
 
 .footer {
-  padding: 20px 16px 28px;
+  padding: 10px 16px 16px;
   color: var(--text-faint);
   font-size: 13px;
   text-align: center;
@@ -569,7 +569,7 @@ svg {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 7vh 0 4vh;
+  padding: 6vh 0 2vh;
   text-align: center;
 }
 
@@ -657,8 +657,34 @@ svg {
   display: none;
 }
 
+/* Each tape is a button covering the whole spine: play the tracks in any order */
+.track-step {
+  position: relative;
+  transition: border-color 0.2s, transform 0.15s;
+}
+
+.track-jump {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.track-step:hover:not(.is-current) {
+  border-color: var(--text-faint);
+  transform: translateX(2px);
+}
+
+.track-jump:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
 /* The tier, written on the spine in marker */
-.track-step > span:not(.track-damage) {
+.track-name {
   font-family: "Permanent Marker", var(--font-body);
   font-size: 14px;
   font-weight: 400;
@@ -687,6 +713,34 @@ svg {
 .track-step.is-missed {
   border-color: rgba(255, 90, 79, 0.4);
   color: var(--wrong);
+}
+
+/* The tape's status line: what's done, what's half-played, what's left */
+.track-status {
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+  text-transform: none;
+}
+
+.track-step.is-solved .track-status { color: var(--correct); }
+.track-step.is-missed .track-status { color: var(--wrong); }
+.track-step.is-progress .track-status { color: var(--partial); }
+.track-step.is-current .track-status { color: var(--text); }
+
+/* A finished tape steps back, so the ones still to play stand out */
+.track-step.is-solved:not(.is-current) .track-name,
+.track-step.is-missed:not(.is-current) .track-name,
+.track-step.is-solved:not(.is-current) .track-damage,
+.track-step.is-missed:not(.is-current) .track-damage {
+  opacity: 0.55;
+}
+
+/* Part-way through: an amber edge, like a tape left in mid-play */
+.track-step.is-progress:not(.is-current) {
+  border-color: rgba(255, 210, 63, 0.45);
 }
 
 /* ---------- Free Play bar ---------- */
@@ -774,9 +828,15 @@ svg {
   top: calc(100% - 44px);
   left: -16px;
   right: -16px;
-  height: 320px;
-  border-top: 1px solid rgba(255, 236, 214, 0.12);
-  background: linear-gradient(180deg, rgba(255, 236, 214, 0.045), transparent 80%);
+  /* Short enough that its faded-out tail never reaches past the page and
+     makes it scroll */
+  height: 170px;
+  /* The surface's front edge catches the room's light; the top itself is a
+     touch lighter than the wall and fades toward you */
+  border-top: 1px solid rgba(255, 236, 214, 0.26);
+  background:
+    linear-gradient(180deg, rgba(255, 236, 214, 0.1), rgba(255, 236, 214, 0.04) 35%, transparent 85%);
+  box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.5);
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
   mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
   pointer-events: none;
@@ -794,7 +854,7 @@ svg {
   right: -16px;
   height: 150px;
   background: radial-gradient(50% 70% at 50% 0, var(--screen-glow), transparent);
-  opacity: 0.7;
+  opacity: 0.9;
   transition: opacity 0.8s var(--ease-out);
   pointer-events: none;
 }
@@ -1342,6 +1402,16 @@ body.is-playing .antenna-rod + .antenna-rod {
   text-transform: uppercase;
 }
 
+/* The current level, in the damage's color: "±6", "Thick wall", "2×" */
+.tracking-level {
+  margin-left: 0.4em;
+  color: var(--damage-color);
+}
+
+.tracking-level:empty {
+  margin-left: 0;
+}
+
 .tracking-meter .bar {
   width: 9px;
   height: 14px;
@@ -1349,7 +1419,7 @@ body.is-playing .antenna-rod + .antenna-rod {
   opacity: 0.5;
 }
 
-.tracking-meter .bar:first-of-type {
+.tracking-level + .bar {
   margin-left: 6px;
 }
 
@@ -2520,6 +2590,24 @@ dd {
     align-self: end;
   }
 
+  /* Daily's tapes frame the TV like your tries do on the other side: their
+     label level with the TV's top, the stack reaching down to its base */
+  .play[data-mode="daily"] .shelf {
+    display: flex;
+    flex-direction: column;
+    /* As tall as the TV, but never taller: on a short screen the stack may
+       run past its base rather than push the guess box down */
+    align-self: start;
+    height: 0;
+    min-height: calc(100% - 58px);
+    margin-top: 58px;
+  }
+
+  .play[data-mode="daily"] .track-progress {
+    flex: 1;
+    grid-auto-rows: 1fr;
+  }
+
   .deck { grid-area: deck; }
 
   /* The surface also runs under the shelf and past the tries */
@@ -2537,9 +2625,22 @@ dd {
   .guess-area { grid-area: guess; }
   .reveal { grid-area: reveal; }
 
+  /* Your tries and the peeks span the TV's height too: the readout level
+     with its top, the peek buttons level with its base */
   .guess-side {
     grid-area: side;
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+    /* As tall as the TV without ever making its row taller (see the shelf) */
+    align-self: start;
+    height: 0;
+    min-height: calc(100% - 58px);
     margin-top: 58px;
+  }
+
+  .guess-side .peeks {
+    margin-top: auto;
   }
 
   .tape-label,
@@ -2614,7 +2715,7 @@ dd {
   .track-step {
     display: grid;
     grid-template-columns: 52px 1fr;
-    grid-template-areas: "value name" "value damage";
+    grid-template-areas: "value name" "value damage" "value status";
     align-items: center;
     column-gap: 10px;
     row-gap: 2px;
@@ -2631,13 +2732,16 @@ dd {
     text-align: center;
   }
 
-  .track-step > span:not(.track-damage) {
+  .track-name {
     grid-area: name;
-  }
-
-  .track-step > span:not(.track-damage) {
     font-size: 18px;
     line-height: 1.2;
+  }
+
+  .track-status {
+    grid-area: status;
+    font-size: 12px;
+    white-space: nowrap;
   }
 
   .track-damage {

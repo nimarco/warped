@@ -79,6 +79,8 @@ export function setMode(mode) {
   }
   elements.trackProgress.hidden = mode !== "daily";
   elements.freeBar.hidden = mode !== "free";
+  // The wide layout frames the TV differently per mode (see "Wide screens" in style.css)
+  elements.playScreen.dataset.mode = mode;
   $("shelf-label").textContent = mode === "daily" ? "Today's tape" : "Free Play mix";
 }
 
@@ -128,6 +130,7 @@ export function renderTrackProgress(tracks, currentIndex, distortions) {
     step.dataset.damage = distortions[index];
 
     const name = document.createElement("span");
+    name.className = "track-name";
     name.textContent = TIER_NAMES[tier];
     const damage = document.createElement("span");
     damage.className = "track-damage";
@@ -136,14 +139,26 @@ export function renderTrackProgress(tracks, currentIndex, distortions) {
     damage.textContent = `${osd.split(" ")[0]} ${damageName}`;
     const value = document.createElement("strong");
 
+    // Where this tape stands, in words: done, part-way, playing or untouched
+    const status = document.createElement("span");
+    status.className = "track-status";
+    const tries = track?.guesses?.length ?? 0;
     if (track?.status === "solved") {
       step.classList.add("is-solved");
       value.textContent = `+${track.points}`;
+      status.textContent = `✓ Solved on try ${tries}`;
     } else if (track?.status === "missed") {
       step.classList.add("is-missed");
       value.textContent = "0";
+      status.textContent = "✕ Missed";
     } else {
       value.textContent = `0${index + 1}`;
+      if (tries > 0) {
+        step.classList.add("is-progress");
+        status.textContent = `● ${tries} of ${MAX_TRIES} tries used`;
+      } else {
+        status.textContent = index === currentIndex ? "▶ Playing now" : "Not started";
+      }
     }
 
     if (index === currentIndex) {
@@ -151,7 +166,17 @@ export function renderTrackProgress(tracks, currentIndex, distortions) {
       step.setAttribute("aria-current", "step");
     }
 
-    step.append(value, name, damage);
+    // The whole tape is a button: play the four tracks in any order.
+    const jump = document.createElement("button");
+    jump.type = "button";
+    jump.className = "track-jump";
+    jump.dataset.track = index;
+    jump.setAttribute("aria-label", `${TIER_NAMES[tier]} track, ${damageName}: ${status.textContent.replace(/^[✓✕●▶] /, "")}`);
+    if (index === currentIndex) {
+      jump.setAttribute("aria-current", "true");
+    }
+
+    step.append(value, name, damage, status, jump);
     return step;
   });
   elements.trackProgress.replaceChildren(...steps);
@@ -387,7 +412,11 @@ export function renderDamage(distortion, level, eased = false) {
     cell.className = index < lit ? "bar is-lit" : "bar";
     return cell;
   });
-  $("tracking-meter").replaceChildren(level === null ? "Clean" : name, ...cells);
+  // The damage and how bad it is right now ("WARP ±6 ▮▮▯▯▯"), always on screen
+  const step = document.createElement("span");
+  step.className = "tracking-level";
+  step.textContent = level === null ? "" : levels[level].label;
+  $("tracking-meter").replaceChildren(level === null ? "Clean" : name, step, ...cells);
   $("tracking-label").textContent =
     level === null ? `${name}: clean now` : `${name}: ${levels[level].label}, step ${level + 1} of ${bars}`;
 

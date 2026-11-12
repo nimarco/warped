@@ -23,7 +23,7 @@
  * Nothing is pre-rendered: every play builds the chain fresh.
  */
 
-import { CLIP_LOUDNESS, CLIP_SECONDS, MAX_CLIP_BOOST } from "./config.js";
+import { CLIP_LOUDNESS, CLIP_LOUDNESS_WEIGHT, CLIP_SECONDS, MAX_CLIP_BOOST } from "./config.js";
 
 const FADE_SECONDS = 0.04;
 
@@ -230,28 +230,51 @@ function makeHissBuffer(ctx) {
   return buffer;
 }
 
-/** Loudest `duration` seconds of a buffer, as a start time in seconds. Usually the chorus. */
-function loudestStart(buffer, duration) {
-  const samples = buffer.getChannelData(0);
-  const rate = buffer.sampleRate;
-  const windowSize = Math.floor(rate / 2);
-  const energies = [];
+/**
+ * Where the clip should start: the `duration` seconds most likely to have
+ * someone singing, as a start time in seconds. The loudest part alone is
+ * often an instrumental drop or solo, which is unfair to guess from. Singing
+ * is usually mixed in the middle and sits above the bass, so each half
+ * second scores its bright, centered sound: the high end of the mid channel
+ * (left + right) minus the high end of the side channel (left − right).
+ * Loudness counts a little too, so a loud chorus beats a quiet verse.
+ */
+function singingStart(buffer, duration) {
+  const left = buffer.getChannelData(0);
+  const right = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : left;
+  const windowSize = Math.floor(buffer.sampleRate / 2);
+  const voice = [];
+  const loud = [];
 
-  for (let index = 0; index + windowSize <= samples.length; index += windowSize) {
-    let sum = 0;
-    for (let offset = 0; offset < windowSize; offset += 16) {
-      sum += samples[index + offset] ** 2;
+  for (let index = 0; index + windowSize <= left.length; index += windowSize) {
+    let mid = 0;
+    let side = 0;
+    let energy = 0;
+    for (let offset = 0; offset + 1 < windowSize; offset += 8) {
+      const at = index + offset;
+      // The step to the next sample: a cheap way to drop the bass and keep the high end.
+      const midStep = left[at + 1] + right[at + 1] - (left[at] + right[at]);
+      const sideStep = left[at + 1] - right[at + 1] - (left[at] - right[at]);
+      mid += midStep * midStep;
+      side += sideStep * sideStep;
+      energy += left[at] * left[at];
     }
-    energies.push(sum);
+    voice.push(Math.max(mid - side, 0));
+    loud.push(energy);
   }
+
+  const most = (values) => Math.max(...values) || 1;
+  const topVoice = most(voice);
+  const topLoud = most(loud);
+  const scores = voice.map((value, index) => value / topVoice + CLIP_LOUDNESS_WEIGHT * (loud[index] / topLoud));
 
   const windowsPerClip = Math.round(duration * 2);
   let bestStart = 0;
-  let bestEnergy = -1;
-  for (let start = 0; start + windowsPerClip <= energies.length; start++) {
-    const energy = energies.slice(start, start + windowsPerClip).reduce((total, value) => total + value, 0);
-    if (energy > bestEnergy) {
-      bestEnergy = energy;
+  let bestScore = -1;
+  for (let start = 0; start + windowsPerClip <= scores.length; start++) {
+    const score = scores.slice(start, start + windowsPerClip).reduce((total, value) => total + value, 0);
+    if (score > bestScore) {
+      bestScore = score;
       bestStart = start;
     }
   }
@@ -334,8 +357,14 @@ export class WarpPlayer {
    * Find where the loudest stretch of the preview starts (in seconds).
    * The loudest part is usually the chorus, which makes the best clip.
    */
+  /** Where to start the clip: the stretch most likely to have singing (see singingStart). */
+  findClipStart(duration = CLIP_SECONDS) {
+    return singingStart(this.buffer, duration);
+  }
+
+  /** The Ladder Lab's older name for findClipStart. */
   findLoudestStart(duration = CLIP_SECONDS) {
-    return loudestStart(this.buffer, duration);
+    return this.findClipStart(duration);
   }
 
   /** The analyser node the visualizer reads from (created on first use). */
@@ -407,7 +436,7 @@ export class WarpPlayer {
       rick.buffer = this.overlay;
       const rickLevel = ctx.createGain();
       // damage.value is Rick's loudness compared with this song's, so quiet and loud songs match.
-      const rickStart = loudestStart(this.overlay, duration);
+      const rickStart = singingStart(this.overlay, duration);
       rickLevel.gain.value = damage.value * (loudness(this.buffer, clipStart, duration) / loudness(this.overlay, rickStart, duration));
       rick.connect(rickLevel).connect(mix);
       rick.start(ctx.currentTime, rickStart, realLength);

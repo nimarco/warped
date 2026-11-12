@@ -16,10 +16,10 @@ export const DISTORTIONS = {
     about: "too fast and too high, slowing down each try",
     // Playback speed. Higher pitch hides who's singing until it slows down.
     levels: [
-      { value: 2.3, label: "very fast" },
-      { value: 2, label: "fast" },
-      { value: 1.6, label: "a bit fast" },
-      { value: 1.3, label: "slightly fast" },
+      { value: 2.3, label: "2.3×" },
+      { value: 2, label: "2×" },
+      { value: 1.6, label: "1.6×" },
+      { value: 1.3, label: "1.3×" },
     ],
   },
   rewind: {
@@ -29,10 +29,10 @@ export const DISTORTIONS = {
     about: "chopped into pieces that play backwards, smaller each try",
     // Seconds per backwards piece. A whole clip (10) is simply reversed.
     levels: [
-      { value: 10, label: "all backwards" },
-      { value: 1, label: "big backwards chunks" },
-      { value: 0.25, label: "small backwards chunks" },
-      { value: 0.06, label: "tiny backwards chunks" },
+      { value: 10, label: "Backwards" },
+      { value: 1, label: "1 s chops" },
+      { value: 0.25, label: "¼ s chops" },
+      { value: 0.06, label: "Tiny chops" },
     ],
   },
   rickroll: {
@@ -42,10 +42,10 @@ export const DISTORTIONS = {
     about: "someone taped Never Gonna Give You Up over it, and it fades each try",
     // Rick's loudness compared with the song's (1 = equally loud). Labels show it as a %.
     levels: [
-      { value: 1.3, label: "Rick louder than the song" },
-      { value: 1, label: "Rick as loud as the song" },
-      { value: 0.55, label: "Rick half as loud" },
-      { value: 0.25, label: "Rick quiet" },
+      { value: 1, label: "100%" },
+      { value: 0.75, label: "75%" },
+      { value: 0.5, label: "50%" },
+      { value: 0.25, label: "25%" },
     ],
   },
   chewed: {
@@ -55,10 +55,10 @@ export const DISTORTIONS = {
     about: "a dog got to the tape, and each try patches a few holes",
     // Share of the clip left intact. Patches never move: what you heard stays.
     levels: [
-      { value: 0.05, label: "shredded" },
-      { value: 0.25, label: "big holes" },
-      { value: 0.5, label: "half there" },
-      { value: 0.75, label: "small holes" },
+      { value: 0.05, label: "Shredded" },
+      { value: 0.25, label: "Mauled" },
+      { value: 0.5, label: "Bitten" },
+      { value: 0.75, label: "Nibbled" },
     ],
   },
   warp: {
@@ -69,10 +69,10 @@ export const DISTORTIONS = {
     // value: biggest pitch jump in semitones (12 = an octave).
     // chunk: about how many seconds between cracks (shorter = more often).
     levels: [
-      { value: 9, chunk: 0.14, label: "wild pitch cracks" },
-      { value: 6, chunk: 0.2, label: "big pitch cracks" },
-      { value: 3.5, chunk: 0.3, label: "small pitch cracks" },
-      { value: 1.5, chunk: 0.45, label: "slight wobble" },
+      { value: 9, chunk: 0.14, label: "±9 notes" },
+      { value: 6, chunk: 0.2, label: "±6" },
+      { value: 3.5, chunk: 0.3, label: "±3.5" },
+      { value: 1.5, chunk: 0.45, label: "±1.5" },
     ],
   },
   muffled: {
@@ -83,10 +83,10 @@ export const DISTORTIONS = {
     // value: low-pass cutoff in Hz (the wall). static: how loud the static is
     // next to the song (1 = equally loud); it also sets how crunchy the tape is.
     levels: [
-      { value: 150, static: 0.9, label: "heavy" },
-      { value: 350, static: 0.55, label: "strong" },
-      { value: 800, static: 0.28, label: "light" },
-      { value: 1800, static: 0.08, label: "faint" },
+      { value: 150, static: 0.9, label: "Next door" },
+      { value: 350, static: 0.55, label: "Thick wall" },
+      { value: 800, static: 0.28, label: "Thin wall" },
+      { value: 1800, static: 0.08, label: "Pillow" },
     ],
   },
 };
@@ -107,6 +107,11 @@ export const TIER_NAMES = {
 
 // Audio clip length in seconds of song time.
 export const CLIP_SECONDS = 10;
+
+// Choosing where the clip starts (warp.js clipStart): how much loudness counts
+// next to the likely singing, so a loud chorus wins over a quiet verse but an
+// instrumental drop doesn't win just for being loud.
+export const CLIP_LOUDNESS_WEIGHT = 0.3;
 
 // Every clip plays at this loudness (RMS, 0–1), whatever the song's mastering:
 // the loudest 10 s of iTunes previews measured 0.07–0.48 (2026-11-05), with
