@@ -341,6 +341,28 @@ svg {
   margin-left: 0.9em;
 }
 
+/* Shown only when index.html is opened as a file (js/file-check.js) */
+.file-warning {
+  position: relative;
+  z-index: 200;
+  margin: 0;
+  padding: 14px 20px;
+  background: var(--partial);
+  color: #1d1600;
+  font-weight: 700;
+  text-align: center;
+}
+
+.file-warning a {
+  color: inherit;
+}
+
+.file-warning code {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
 /* ---------- Top bar ---------- */
 
 .topbar {
