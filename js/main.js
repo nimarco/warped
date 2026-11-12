@@ -215,7 +215,9 @@ async function startTrack(candidates, tier, distortion, saved, attempt = 1) {
       }, BUSY_RETRY_MS);
       return;
     }
-    ui.setTvStatus({ text: error.message, retry: true });
+    // Our own errors are written for players; a programming error's text isn't.
+    const isBug = ["TypeError", "ReferenceError", "RangeError", "SyntaxError"].includes(error.name);
+    ui.setTvStatus({ text: isBug ? "Couldn't load this track. Press Try again, or pick another tape." : error.message, retry: true });
   }
 }
 
@@ -260,7 +262,8 @@ function trackLabel(tier) {
 
 function loadDailyTrack() {
   const index = app.day.current;
-  const saved = app.day.tracks[index];
+  // Tracks not played yet are empty (null after a reload), so treat both as "no progress"
+  const saved = app.day.tracks[index] ?? undefined;
   // A saved track keeps the exact song it started with (even if it was a backup).
   const candidates = saved ? SONGS.filter((song) => song.id === saved.id).slice(0, 1) : lineup[index];
   ui.renderTrackProgress(app.day.tracks, index, dailyDistortions);

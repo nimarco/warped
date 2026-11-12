@@ -95,7 +95,10 @@ export class TrackRound {
    * @param {string} distortion  a key of DISTORTIONS
    * @param {object} [saved] progress restored from storage
    */
-  constructor(song, tier, distortion, saved = {}) {
+  constructor(song, tier, distortion, saved) {
+    // A track that hasn't been played has no saved progress (undefined, or
+    // null once the day's progress has been saved and reloaded)
+    saved ??= {};
     this.song = song;
     this.tier = tier;
     this.distortion = distortion;
